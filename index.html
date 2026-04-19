@@ -1,0 +1,2639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>eCornell GraphRAG — Personalized Learning Pathways</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #B31B1B;
+    --red-dark: #8B1515;
+    --red-light: #fef2f2;
+    --navy: #0f172a;
+    --navy-mid: #1e293b;
+    --navy-light: #334155;
+    --slate: #64748b;
+    --muted: #94a3b8;
+    --border: #e2e8f0;
+    --bg: #f8fafc;
+    --white: #ffffff;
+    --sidebar-w: 380px;
+    --header-h: 72px;
+  }
+
+  html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--navy); }
+
+  /* ── HEADER ── */
+  .header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: var(--header-h);
+    background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px;
+    box-shadow: 0 2px 12px rgba(179,27,27,0.3);
+  }
+  .header-brand { display: flex; align-items: center; gap: 14px; }
+  .header-logo {
+    width: 36px; height: 36px; background: rgba(255,255,255,0.15);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -1px;
+  }
+  .header-title { color: #fff; font-size: 17px; font-weight: 700; line-height: 1.2; }
+  .header-sub { color: rgba(255,255,255,0.65); font-size: 11px; font-weight: 400; margin-top: 1px; }
+  .header-stats { display: flex; gap: 24px; }
+  .stat { text-align: right; }
+  .stat-num { color: #fff; font-size: 18px; font-weight: 800; line-height: 1; }
+  .stat-label { color: rgba(255,255,255,0.6); font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; }
+  .header-cta {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+    color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all .2s; white-space: nowrap;
+  }
+  .header-cta:hover { background: rgba(255,255,255,0.25); }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    margin-top: var(--header-h);
+    height: calc(100vh - var(--header-h));
+    overflow: hidden;
+  }
+
+  /* ── GRAPH AREA (75% container for graph + overlays) ── */
+  .graph-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  /* ── CANVAS SEARCH BAR (floating overlay at top of graph) ── */
+  .canvas-search-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 25;
+    padding: 10px 12px 20px;
+    background: linear-gradient(to bottom, rgba(10,15,26,0.96) 60%, transparent);
+    pointer-events: none;
+  }
+  .canvas-search-bar > * { pointer-events: all; }
+  .canvas-search-bar .rag-search-label { display: none; }
+  .canvas-search-bar .rag-search-wrap {
+    background: rgba(15,23,42,0.78);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(179,27,27,0.22);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 0;
+  }
+  .canvas-search-bar .search-bar { margin-bottom: 0; margin-top: 6px; }
+  .canvas-search-bar .search-input {
+    background: rgba(15,23,42,0.78);
+    backdrop-filter: blur(10px);
+    color: rgba(255,255,255,0.9);
+    border-color: rgba(255,255,255,0.12);
+  }
+  .canvas-search-bar .search-input::placeholder { color: rgba(255,255,255,0.28); }
+  .canvas-search-bar .search-input:focus { border-color: var(--red); box-shadow: 0 0 0 2px rgba(179,27,27,0.2); }
+  .canvas-search-bar .filter-select {
+    background: rgba(15,23,42,0.78);
+    backdrop-filter: blur(10px);
+    color: rgba(255,255,255,0.75);
+    border-color: rgba(255,255,255,0.12);
+  }
+  .canvas-search-bar .filter-select option { background: #0f172a; color: #fff; }
+
+  /* ── CATALOG (slide-in cards panel over graph) ── */
+  .catalog {
+    position: absolute;
+    left: 0; top: 104px; bottom: 0;
+    width: 320px;
+    z-index: 20;
+    overflow-y: auto;
+    background: rgba(10,15,26,0.93);
+    backdrop-filter: blur(16px);
+    border-right: 1px solid rgba(255,255,255,0.08);
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    display: flex;
+    flex-direction: column;
+    min-width: unset;
+  }
+  .catalog.open {
+    transform: translateX(0);
+    box-shadow: 6px 0 24px rgba(0,0,0,0.45);
+  }
+  .catalog-header {
+    position: sticky; top: 0; z-index: 2;
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    background: rgba(10,15,26,0.97);
+  }
+  .catalog-title { font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 500; flex: 1; }
+  .catalog-title span { color: var(--red); font-weight: 700; }
+  .catalog-close {
+    width: 26px; height: 26px;
+    background: rgba(255,255,255,0.06); border: none;
+    border-radius: 5px; color: rgba(255,255,255,0.4);
+    cursor: pointer; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all .15s; font-family: inherit;
+  }
+  .catalog-close:hover { background: rgba(179,27,27,0.35); color: #fff; }
+  .catalog-body { flex: 1; padding: 10px 12px; }
+
+  /* Dark-panel card overrides (catalog is now dark) */
+  .catalog .course-card {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.08);
+    min-height: unset;
+  }
+  .catalog .course-card:hover {
+    background: rgba(179,27,27,0.1);
+    border-color: rgba(179,27,27,0.4);
+    box-shadow: none; transform: none;
+  }
+  .catalog .course-card.highlighted {
+    background: rgba(179,27,27,0.12);
+    border-color: rgba(179,27,27,0.35);
+  }
+  .catalog .card-title { color: rgba(255,255,255,0.88); }
+  .catalog .card-program {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.5);
+    border-color: rgba(255,255,255,0.1);
+  }
+  .catalog .card-instructor { color: rgba(255,255,255,0.38); }
+  .catalog .result-count { color: rgba(255,255,255,0.5); }
+  .catalog .result-count span { color: var(--red); }
+  .catalog .empty-state { color: rgba(255,255,255,0.4); }
+  .catalog .empty-state h3 { color: rgba(255,255,255,0.55); }
+  .catalog .load-more-btn {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.5);
+  }
+  .catalog .load-more-btn:hover { border-color: var(--red); color: var(--red); }
+  /* Dark skeleton loaders */
+  .catalog .skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.05) 75%) !important;
+    background-size: 200% 100% !important;
+  }
+  .catalog .course-grid > div:not(.course-card):not(.empty-state) {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 10px;
+  }
+
+  /* Search + Filter Bar */
+  .search-bar {
+    display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .search-wrap {
+    flex: 1; min-width: 200px;
+    position: relative;
+  }
+  .search-icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 15px; pointer-events: none;
+  }
+  .search-input {
+    width: 100%; padding: 10px 12px 10px 36px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: var(--white);
+    outline: none; transition: border-color .2s, box-shadow .2s;
+    color: var(--navy);
+  }
+  .search-input:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(179,27,27,0.08); }
+  .search-input::placeholder { color: var(--muted); }
+  .filter-select {
+    padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; font-family: inherit; background: var(--white);
+    outline: none; cursor: pointer; color: var(--navy); max-width: 220px;
+  }
+  .filter-select:focus { border-color: var(--red); }
+
+  /* Result count */
+  .result-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 8px;
+  }
+  .result-count { font-size: 13px; color: var(--slate); font-weight: 500; }
+  .result-count span { color: var(--red); font-weight: 700; }
+  .view-toggle { display: flex; gap: 4px; }
+  .view-btn {
+    padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--white); cursor: pointer; font-size: 12px; color: var(--slate);
+    transition: all .15s;
+  }
+  .view-btn.active { background: var(--red); color: #fff; border-color: var(--red); }
+
+  /* Course Grid */
+  .course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+  .course-grid.list-view { grid-template-columns: 1fr; }
+
+  /* Course Card */
+  .course-card {
+    background: var(--white); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; cursor: pointer;
+    transition: all .2s; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; gap: 8px;
+    min-height: 120px;
+  }
+  .course-card:hover {
+    border-color: var(--red); box-shadow: 0 4px 16px rgba(179,27,27,0.1);
+    transform: translateY(-1px);
+  }
+  .course-card.highlighted {
+    border-color: var(--red);
+    background: linear-gradient(135deg, #fff 0%, var(--red-light) 100%);
+  }
+  .course-card.highlighted::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--red), #f59e42);
+  }
+  .card-program {
+    display: inline-flex; align-items: center;
+    background: var(--bg); color: var(--slate);
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.6px; padding: 3px 7px; border-radius: 4px;
+    border: 1px solid var(--border); max-width: 100%;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 600; color: var(--navy);
+    line-height: 1.4; flex: 1;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-instructor {
+    font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px;
+  }
+  .card-instructor svg { flex-shrink: 0; }
+  .card-link {
+    position: absolute; top: 10px; right: 10px;
+    color: var(--muted); opacity: 0.45; transition: all .15s;
+    text-decoration: none; font-size: 12px;
+  }
+  .course-card:hover .card-link { opacity: 1; color: var(--red); }
+  .card-match {
+    display: none; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+  .card-match.visible { display: block; }
+  .card-match-bar { height: 100%; background: linear-gradient(90deg, var(--red), #f59e42); transition: width .4s ease; }
+
+  /* Load more */
+  .load-more-wrap { text-align: center; padding: 24px 0; }
+  .load-more-btn {
+    background: var(--white); border: 1px solid var(--border);
+    padding: 10px 28px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    color: var(--slate); cursor: pointer; transition: all .2s;
+  }
+  .load-more-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── GRAPH PANEL (fills the graph-area absolutely) ── */
+  .graph-panel {
+    position: absolute;
+    inset: 0;
+    background: #0a0f1a;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .graph-panel-header {
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .graph-panel-title { color: #fff; font-size: 13px; font-weight: 700; }
+  .graph-panel-sub { color: var(--muted); font-size: 11px; margin-top:2px; }
+  .graph-legend { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+  .graph-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
+  .graph-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  #graph-canvas { flex: 1; width: 100%; min-height: 0; }
+  .graph-tooltip {
+    position: fixed; background: rgba(15,23,42,0.96); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #fff;
+    pointer-events: none; z-index: 200; max-width: 220px; line-height: 1.5;
+    display: none;
+  }
+  .graph-tooltip strong { color: #f59e42; display: block; margin-bottom: 2px; }
+
+  /* ── SIDEBAR (25-28% — form is no longer cut off) ── */
+  .sidebar {
+    flex: 0 0 28%;
+    min-width: 300px;
+    max-width: 440px;
+    background: var(--navy);
+    overflow-y: auto; display: flex; flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding: 24px 24px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    position: sticky; top: 0; background: var(--navy); z-index: 10;
+  }
+  .sidebar-title { color: #fff; font-size: 17px; font-weight: 700; line-height: 1.3; }
+  .sidebar-sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  /* Progress */
+  .progress-wrap { padding: 16px 24px 0; }
+  .progress-steps { display: flex; gap: 4px; margin-bottom: 8px; }
+  .progress-step {
+    flex: 1; height: 3px; border-radius: 2px;
+    background: rgba(255,255,255,0.1); transition: background .3s;
+  }
+  .progress-step.done { background: var(--red); }
+  .progress-step.active { background: linear-gradient(90deg, var(--red), #f59e42); }
+  .progress-label {
+    font-size: 11px; color: var(--muted); font-weight: 500;
+    display: flex; justify-content: space-between;
+  }
+  .progress-label span:first-child { color: rgba(255,255,255,0.7); }
+
+  /* Form body */
+  .form-body { padding: 20px 24px; flex: 1; }
+
+  .step-block { display: none; }
+  .step-block.active { display: block; }
+
+  .step-section-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--red); font-weight: 700; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .step-section-label::after {
+    content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.08);
+  }
+
+  .question-block { margin-bottom: 16px; }
+  .question-label {
+    display: block; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9);
+    margin-bottom: 6px; line-height: 1.4;
+  }
+  .question-hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; font-style: italic; }
+
+  .form-input, .form-textarea {
+    width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: rgba(255,255,255,0.9); font-family: inherit;
+    font-size: 13px; outline: none; transition: border-color .2s, box-shadow .2s;
+    resize: vertical;
+  }
+  .form-input { padding: 10px 12px; }
+  .form-textarea { padding: 10px 12px; min-height: 80px; }
+  .form-input::placeholder, .form-textarea::placeholder { color: rgba(255,255,255,0.25); }
+  .form-input:focus, .form-textarea:focus {
+    border-color: rgba(179,27,27,0.6);
+    box-shadow: 0 0 0 3px rgba(179,27,27,0.15);
+  }
+
+  /* GraphRAG Insight Box */
+  .rag-insight {
+    background: rgba(179,27,27,0.12); border: 1px solid rgba(179,27,27,0.25);
+    border-radius: 8px; padding: 14px; margin: 16px 0;
+  }
+  .rag-insight-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: rgba(179,27,27,0.9); font-weight: 700; margin-bottom: 8px;
+  }
+  .rag-insight-header svg { flex-shrink: 0; }
+  .rag-insight p {
+    font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.65;
+  }
+  .rag-insight code {
+    background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px;
+    font-size: 11px; color: rgba(255,255,255,0.7); font-family: 'Courier New', monospace;
+  }
+
+  /* Nav buttons */
+  .form-nav {
+    display: flex; gap: 10px; margin-top: 4px;
+    padding: 16px 24px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    position: sticky; bottom: 0; background: var(--navy);
+  }
+  .btn-back {
+    padding: 10px 16px; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--muted);
+    cursor: pointer; background: transparent; font-family: inherit; transition: all .2s;
+  }
+  .btn-back:hover { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.7); }
+  .btn-back:disabled { opacity: 0.3; cursor: default; }
+  .btn-next {
+    flex: 1; padding: 11px 16px; background: var(--red);
+    border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+    color: #fff; cursor: pointer; font-family: inherit; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn-next:hover { background: var(--red-dark); transform: translateY(-1px); }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    display: none;
+    position: fixed; inset: 0; z-index: 500;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-backdrop.open { display: flex; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+  .modal {
+    background: var(--navy);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    width: 100%; max-width: 780px;
+    max-height: 90vh;
+    display: flex; flex-direction: column;
+    animation: slideUp .25s ease;
+    overflow: hidden;
+  }
+  @keyframes slideUp { from{transform:translateY(24px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .modal-header-left { display: flex; flex-direction: column; gap: 3px; }
+  .modal-title { color: #fff; font-size: 17px; font-weight: 700; }
+  .modal-sub { color: var(--muted); font-size: 12px; }
+  .modal-close {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+    color: var(--muted); font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s; flex-shrink: 0;
+  }
+  .modal-close:hover { background: rgba(255,255,255,0.14); color: #fff; }
+
+  .modal-body {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  /* Status stream bar */
+  .status-log {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px; padding: 12px 14px;
+    font-size: 11px; color: rgba(52,211,153,0.8); font-family: 'Courier New', monospace;
+    line-height: 1.8; flex-shrink: 0;
+  }
+  .status-log .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #34d399; margin-right: 6px; animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Markdown-rendered pathway */
+  .pathway-output {
+    flex: 1;
+    font-size: 13.5px; color: rgba(255,255,255,0.85); line-height: 1.75;
+    word-break: break-word; min-height: 100px;
+  }
+  .pathway-output h2 { color: var(--red); font-size: 15px; font-weight: 700; margin: 20px 0 8px; border-bottom: 1px solid rgba(179,27,27,0.25); padding-bottom: 6px; }
+  .pathway-output h3 { color: rgba(255,255,255,0.95); font-size: 13px; font-weight: 700; margin: 14px 0 5px; }
+  .pathway-output strong { color: #fff; }
+  .pathway-output em { color: var(--muted); font-style: italic; }
+  .pathway-output a { color: #4f8cf7; text-decoration: none; }
+  .pathway-output a:hover { text-decoration: underline; }
+  .pathway-output ul, .pathway-output ol { padding-left: 18px; margin: 6px 0; }
+  .pathway-output li { margin: 4px 0; }
+  .pathway-output hr { border: none; border-top: 1px solid rgba(255,255,255,0.07); margin: 16px 0; }
+  .pathway-output br { display: block; margin: 4px 0; content: ''; }
+
+  /* Follow-up chat */
+  .chat-divider {
+    display: none; align-items: center; gap: 10px;
+    margin: 8px 0 4px; color: var(--muted); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.6px;
+  }
+  .chat-divider.visible { display: flex; }
+  .chat-divider::before, .chat-divider::after { content:''; flex:1; height:1px; background: rgba(255,255,255,0.06); }
+
+  .chat-history { display: flex; flex-direction: column; gap: 10px; }
+  .chat-msg {
+    border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.65;
+    max-width: 94%;
+  }
+  .chat-msg.user {
+    background: rgba(179,27,27,0.15); border: 1px solid rgba(179,27,27,0.2);
+    color: rgba(255,255,255,0.9); align-self: flex-end;
+    border-bottom-right-radius: 3px;
+  }
+  .chat-msg.assistant {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.82); align-self: flex-start;
+    border-bottom-left-radius: 3px;
+  }
+  .chat-msg.assistant h2, .chat-msg.assistant h3 { color: var(--red); font-size: 13px; margin: 10px 0 4px; }
+  .chat-msg.assistant strong { color: #fff; }
+  .chat-msg.assistant em { color: var(--muted); }
+  .chat-msg.assistant ul { padding-left: 16px; margin: 4px 0; }
+  .chat-msg.assistant li { margin: 3px 0; }
+
+  .modal-footer {
+    padding: 14px 24px; border-top: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;
+  }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input {
+    flex: 1; padding: 11px 14px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; color: rgba(255,255,255,0.9); font-family: inherit;
+    font-size: 13px; outline: none; transition: border-color .2s; resize: none;
+    max-height: 100px; min-height: 42px;
+  }
+  .chat-input::placeholder { color: rgba(255,255,255,0.25); }
+  .chat-input:focus { border-color: rgba(179,27,27,0.5); }
+  .chat-send-btn {
+    padding: 11px 18px; background: var(--red); border: none;
+    border-radius: 10px; color: #fff; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: background .2s; align-self: flex-end;
+  }
+  .chat-send-btn:hover { background: var(--red-dark); }
+  .chat-send-btn:disabled { opacity: 0.5; cursor: default; }
+
+  .modal-footer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .copy-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;
+    font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6);
+    cursor: pointer; font-family: inherit; transition: all .2s;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.13); color: #fff; }
+  .copy-btn.copied { background: rgba(52,211,153,0.15); border-color: rgba(52,211,153,0.3); color: #34d399; }
+
+  .search-queries { margin-top: 16px; }
+  .search-queries h4 { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+  .query-chip {
+    display: inline-block; background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
+    padding: 4px 10px; font-size: 11px; color: rgba(255,255,255,0.6);
+    margin: 3px 4px 3px 0; cursor: pointer; transition: all .15s;
+  }
+  .query-chip:hover { background: rgba(179,27,27,0.2); border-color: rgba(179,27,27,0.4); color: rgba(255,255,255,0.9); }
+
+  .run-cmd {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 7px; padding: 10px 12px; margin-top: 10px;
+    font-family: 'Courier New', monospace; font-size: 11px; color: rgba(52,211,153,0.8);
+    line-height: 1.8;
+  }
+  .cmd-label { font-family: 'Inter', sans-serif; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+
+  /* Empty state */
+  .empty-state {
+    grid-column: 1/-1; text-align: center; padding: 48px 20px; color: var(--muted);
+  }
+  .empty-state-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state h3 { font-size: 15px; font-weight: 600; color: var(--slate); margin-bottom: 6px; }
+  .empty-state p { font-size: 13px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
+  .sidebar ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); }
+
+  /* ── Tablet: tighten sidebar ── */
+  @media (max-width: 1100px) {
+    .sidebar { flex: 0 0 30%; min-width: 280px; }
+    .catalog { width: 290px; }
+  }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    .graph-area { flex: 1; min-height: 55vh; }
+    .sidebar { flex: 0 0 auto; width: 100%; min-width: unset; max-width: unset; }
+    .header-stats { display: none; }
+  }
+
+  /* ── Mobile tab bar (hidden on desktop) ── */
+  .mobile-tabs { display: none; }
+
+  /* ── Mobile: full tab-based layout ── */
+  @media (max-width: 768px) {
+    /* Override CSS custom property for mobile header height */
+    :root { --header-h: 56px; }
+
+    /* ── Prevent iOS input zoom — ALL inputs must be 16px+ ── */
+    input, select, textarea,
+    .search-input, .form-input, .form-textarea, .filter-select,
+    .rag-search-input, .chat-input { font-size: 16px !important; }
+
+    /* ── Header: compact single row ── */
+    .header { height: 56px; padding: 0 16px; }
+    .header-sub { display: none; }
+    .header-logo { width: 30px; height: 30px; font-size: 14px; }
+    .header-title { font-size: 14px; }
+    .header-stats { display: none; }
+    .header-cta { padding: 10px 14px; font-size: 12px; min-height: 44px; }
+    .header-cta:active { background: rgba(255,255,255,0.25); }
+
+    /* ── Layout: column, graph-area drives both courses+graph tabs ── */
+    .layout {
+      flex-direction: column;
+      margin-top: 56px;
+      height: calc(100dvh - 56px - calc(60px + env(safe-area-inset-bottom, 0px)));
+      overflow: hidden;
+    }
+
+    /* Graph area fills its portion; sidebar hidden by default */
+    .graph-area {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      background: var(--bg);
+    }
+    .sidebar { display: none; width: 100% !important; min-width: unset !important; max-width: unset !important; }
+    .sidebar.mobile-active { display: flex; height: 100%; }
+
+    /* ── Canvas search bar: normal flow in mobile-courses mode ── */
+    .canvas-search-bar {
+      position: relative !important;
+      top: unset !important; left: unset !important; right: unset !important;
+      background: var(--bg) !important;
+      padding: 12px 16px 8px !important;
+      pointer-events: all;
+      display: none;
+    }
+    .canvas-search-bar .rag-search-label { display: flex !important; }
+    .canvas-search-bar .rag-search-wrap {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%) !important;
+      backdrop-filter: none !important;
+      border: 1px solid rgba(179,27,27,0.2) !important;
+    }
+    .canvas-search-bar .search-input {
+      background: var(--white) !important;
+      color: var(--navy) !important;
+      border-color: var(--border) !important;
+    }
+    .canvas-search-bar .search-input::placeholder { color: var(--muted) !important; }
+    .canvas-search-bar .search-input:focus { border-color: var(--red) !important; box-shadow: 0 0 0 3px rgba(179,27,27,0.08) !important; }
+    .canvas-search-bar .filter-select {
+      background: var(--white) !important;
+      color: var(--navy) !important;
+      border-color: var(--border) !important;
+    }
+    .canvas-search-bar .filter-select option { background: #fff; color: var(--navy); }
+
+    /* ── Catalog: hidden by default, shown in mobile-courses mode ── */
+    .catalog {
+      position: relative !important;
+      left: unset !important; top: unset !important; bottom: unset !important;
+      width: 100% !important;
+      transform: none !important;
+      background: var(--bg) !important;
+      backdrop-filter: none !important;
+      border-right: none !important;
+      display: none;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .catalog-header { background: var(--bg) !important; border-bottom-color: var(--border) !important; }
+    .catalog-title { color: var(--slate) !important; }
+    .catalog-close { display: none; }
+    /* Restore light card styles on mobile */
+    .catalog .course-card { background: var(--white) !important; border-color: var(--border) !important; min-height: 120px !important; }
+    .catalog .course-card:hover { box-shadow: 0 4px 16px rgba(179,27,27,0.1) !important; transform: translateY(-1px) !important; border-color: var(--red) !important; }
+    .catalog .card-title { color: var(--navy) !important; }
+    .catalog .card-program { background: var(--bg) !important; color: var(--slate) !important; border-color: var(--border) !important; }
+    .catalog .card-instructor { color: var(--muted) !important; }
+    .catalog .load-more-btn { background: var(--white) !important; border-color: var(--border) !important; color: var(--slate) !important; }
+    .catalog .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%) !important; }
+    .catalog .course-grid > div:not(.course-card):not(.empty-state) { background: var(--white) !important; border-color: var(--border) !important; }
+    .catalog .empty-state { color: var(--muted) !important; }
+    .catalog .empty-state h3 { color: var(--slate) !important; }
+    .catalog-body { padding: 0 16px 16px !important; }
+
+    /* ── Graph panel: hidden by default, shown in mobile-graph mode ── */
+    .graph-panel {
+      display: none;
+      position: absolute !important;
+      inset: 0 !important;
+      width: 100% !important; height: 100% !important;
+    }
+
+    /* ── Mobile courses mode ── */
+    .graph-area.mobile-courses { display: flex; flex-direction: column; background: var(--bg); overflow-y: auto; }
+    .graph-area.mobile-courses .canvas-search-bar { display: block !important; }
+    .graph-area.mobile-courses .catalog { display: flex !important; flex: 1; }
+    .graph-area.mobile-courses .graph-panel { display: none !important; }
+
+    /* ── Mobile graph mode ── */
+    .graph-area.mobile-graph { background: #0a0f1a; }
+    .graph-area.mobile-graph .canvas-search-bar { display: none !important; }
+    .graph-area.mobile-graph .catalog { display: none !important; }
+    .graph-area.mobile-graph .graph-panel { display: flex !important; }
+
+    /* Grid single column on mobile */
+    .course-grid { grid-template-columns: 1fr; }
+
+    /* ── Touch targets: 44x44px minimum ── */
+    .modal-close { width: 44px; height: 44px; border-radius: 10px; }
+    .view-btn { padding: 10px 12px; min-height: 44px; }
+    .btn-back { min-height: 44px; padding: 10px 16px; }
+    .btn-next { min-height: 44px; padding: 13px 16px; }
+    .copy-btn { min-height: 44px; }
+    .rag-search-btn { min-height: 44px; padding: 12px 16px; }
+    .rag-clear { min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; }
+    .load-more-btn { min-height: 44px; width: 100%; }
+    .chat-send-btn { min-height: 44px; padding: 12px 18px; }
+    .query-chip { padding: 10px 14px; }
+
+    /* ── Active (tap) feedback ── */
+    .course-card:active { border-color: var(--red); box-shadow: 0 4px 16px rgba(179,27,27,0.15); transform: scale(0.99); }
+    .btn-next:active { background: var(--red-dark); transform: scale(0.98); }
+    .btn-back:active { border-color: rgba(255,255,255,0.3); }
+    .rag-search-btn:active { background: var(--red-dark); }
+    .load-more-btn:active { border-color: var(--red); color: var(--red); }
+    .chat-send-btn:active { background: var(--red-dark); }
+    .copy-btn:active { background: rgba(255,255,255,0.13); color: #fff; }
+    .query-chip:active { background: rgba(179,27,27,0.2); border-color: rgba(179,27,27,0.4); }
+
+    /* ── Modal: bottom sheet on mobile ── */
+    .modal-backdrop { padding: 0; align-items: flex-end; }
+    .modal { max-height: 92vh; border-radius: 20px 20px 0 0; width: 100%; max-width: 100%; }
+    /* Drag handle for bottom sheet */
+    .modal-header::before {
+      content: ''; position: absolute; top: 10px; left: 50%;
+      transform: translateX(-50%); width: 40px; height: 4px;
+      background: rgba(255,255,255,0.15); border-radius: 2px;
+    }
+    .modal-header { padding: 28px 20px 14px; position: relative; }
+    .modal-body { padding: 16px 20px; }
+
+    /* ── Safe area insets ── */
+    .form-nav { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+    .modal-footer { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+
+    /* ── Bottom tab bar ── */
+    .mobile-tabs {
+      display: flex;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: calc(60px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: var(--navy);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      z-index: 300;
+    }
+    .mobile-tab {
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px;
+      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
+      color: rgba(255,255,255,0.35);
+      cursor: pointer; border: none; background: none; font-family: inherit;
+      transition: color .15s; min-height: 44px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mobile-tab.active { color: var(--red); }
+    .mobile-tab:active { opacity: 0.7; }
+    .mobile-tab svg { flex-shrink: 0; }
+  }
+
+  /* ── Reduced motion ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Skeleton loader */
+  .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 6px; }
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+  /* RAG Search bar */
+  .rag-search-wrap {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+    border-radius: 12px; padding: 16px 20px; margin-bottom: 18px;
+    border: 1px solid rgba(179,27,27,0.2);
+  }
+  .rag-search-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: rgba(179,27,27,0.8); font-weight: 700; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .rag-search-row { display: flex; gap: 8px; }
+  .rag-search-input {
+    flex: 1; padding: 10px 14px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: rgba(255,255,255,0.9); font-family: inherit;
+    font-size: 13px; outline: none; transition: border-color .2s;
+  }
+  .rag-search-input::placeholder { color: rgba(255,255,255,0.25); }
+  .rag-search-input:focus { border-color: rgba(179,27,27,0.5); }
+  .rag-search-btn {
+    padding: 10px 16px; background: var(--red); border: none;
+    border-radius: 8px; color: #fff; font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: inherit; white-space: nowrap; transition: background .2s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .rag-search-btn:hover { background: var(--red-dark); }
+  .rag-search-btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* RAG search results overlay in catalog */
+  .rag-results-bar {
+    display: none; align-items: center; gap: 8px;
+    padding: 8px 12px; background: rgba(179,27,27,0.08);
+    border: 1px solid rgba(179,27,27,0.2); border-radius: 8px; margin-bottom: 12px;
+    font-size: 12px; color: rgba(255,255,255,0.7);
+  }
+  .rag-results-bar.visible { display: flex; }
+  .rag-results-bar .rag-q { color: #fff; font-weight: 600; }
+  .rag-clear { margin-left: auto; cursor: pointer; color: var(--muted); font-size: 11px; }
+  .rag-clear:hover { color: #fff; }
+
+  /* Graph context panel shown after RAG search */
+  .graph-context-panel {
+    display: none; flex-direction: column; gap: 10px;
+    padding: 14px 16px; margin-bottom: 14px;
+    background: linear-gradient(135deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.9) 100%);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+    border-left: 3px solid var(--red);
+  }
+  .graph-context-panel.visible { display: flex; }
+  .graph-context-header {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 10px; font-weight: 700; color: var(--red);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .graph-context-summary {
+    font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.6;
+  }
+  .graph-context-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+  .graph-chip {
+    padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500;
+    background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: all .15s;
+  }
+  .graph-chip:hover { background: rgba(179,27,27,0.2); color: #fff; border-color: rgba(179,27,27,0.4); }
+  .graph-chip.bridge { border-color: rgba(234,179,8,0.3); color: rgba(234,179,8,0.9); background: rgba(234,179,8,0.08); }
+  .graph-expanded-stat { font-size: 11px; color: rgba(255,255,255,0.35); }
+
+  /* Live search highlight */
+  mark { background: rgba(179,27,27,0.15); color: var(--red); border-radius: 2px; font-style: normal; }
+
+  /* Graph node keyboard focus ring — 2px white outline, 3:1 contrast on dark background */
+  #graph-canvas circle:focus-visible {
+    outline: none;
+    stroke: #fff !important;
+    stroke-width: 3px !important;
+    stroke-opacity: 1 !important;
+    filter: drop-shadow(0 0 5px rgba(255,255,255,0.6));
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-brand">
+    <div class="header-logo">eC</div>
+    <div>
+      <div class="header-title">eCornell GraphRAG</div>
+      <div class="header-sub">Semantic Course Discovery · Personalized Pathways</div>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="stat"><div class="stat-num" id="total-courses">—</div><div class="stat-label">Courses</div></div>
+    <div class="stat"><div class="stat-num" id="total-programs">—</div><div class="stat-label">Programs</div></div>
+    <div class="stat"><div class="stat-num">226</div><div class="stat-label">Instructors</div></div>
+  </div>
+  <button class="header-cta" onclick="scrollSidebar()">Build My Pathway →</button>
+</header>
+
+<!-- MAIN LAYOUT -->
+<div class="layout">
+
+  <!-- GRAPH AREA: canvas (75%) + floating search overlay + slide-in cards panel -->
+  <div class="graph-area" id="graph-area">
+
+    <!-- Floating search/filter overlay (always visible at top of canvas) -->
+    <div class="canvas-search-bar" id="canvas-search-bar">
+      <!-- RAG Semantic Search -->
+      <div class="rag-search-wrap">
+        <div class="rag-search-label">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          Semantic Search — GraphRAG
+        </div>
+        <div class="rag-search-row">
+          <input type="text" class="rag-search-input" id="rag-search-input"
+            placeholder="e.g. behavioral science for productivity coaches… or notion templates for real estate…"
+            onkeydown="if(event.key==='Enter') runRagSearch()">
+          <button class="rag-search-btn" id="rag-search-btn" onclick="runRagSearch()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            Search
+          </button>
+        </div>
+      </div>
+      <!-- Text filter -->
+      <div class="search-bar" style="margin-bottom:0">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input type="text" class="search-input" id="search-input"
+            placeholder="Filter by title, program, or instructor…"
+            oninput="handleSearch(this.value)">
+        </div>
+        <select class="filter-select" id="program-filter" onchange="handleFilter()">
+          <option value="">All Programs</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Course cards panel (slides in from left when search/filter/node-click active) -->
+    <main class="catalog" id="catalog">
+      <div class="catalog-header">
+        <div class="catalog-title"><span id="count-display">…</span> courses</div>
+        <div class="view-toggle">
+          <button class="view-btn active" id="grid-btn" onclick="setView('grid')" title="Grid view">⊞</button>
+          <button class="view-btn" id="list-btn" onclick="setView('list')" title="List view">☰</button>
+        </div>
+        <button class="catalog-close" onclick="closeCatalog()" title="Close">✕</button>
+      </div>
+      <div class="catalog-body">
+        <!-- RAG results status bar -->
+        <div class="rag-results-bar" id="rag-results-bar">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#B31B1B;flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          Showing semantic results for: <span class="rag-q" id="rag-q-display"></span>
+          <span class="rag-clear" onclick="clearRagSearch()">✕ Clear</span>
+        </div>
+
+        <!-- Graph context panel (shown after RAG search) -->
+        <div class="graph-context-panel" id="graph-context-panel">
+          <div class="graph-context-header">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+            Knowledge Graph — Discovered Context
+            <span class="graph-expanded-stat" id="graph-expanded-stat"></span>
+          </div>
+          <div class="graph-context-summary" id="graph-context-summary"></div>
+          <div id="graph-context-chips" class="graph-context-chips"></div>
+        </div>
+
+        <!-- Course grid -->
+        <div class="course-grid" id="course-grid">
+          <!-- Skeleton loaders -->
+          <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+            <div class="skeleton" style="height:18px;width:60%"></div>
+            <div class="skeleton" style="height:14px;width:90%"></div>
+            <div class="skeleton" style="height:14px;width:70%"></div>
+            <div class="skeleton" style="height:11px;width:50%"></div>
+          </div>
+          <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+            <div class="skeleton" style="height:18px;width:75%"></div>
+            <div class="skeleton" style="height:14px;width:85%"></div>
+            <div class="skeleton" style="height:14px;width:65%"></div>
+            <div class="skeleton" style="height:11px;width:45%"></div>
+          </div>
+          <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+            <div class="skeleton" style="height:18px;width:80%"></div>
+            <div class="skeleton" style="height:14px;width:80%"></div>
+            <div class="skeleton" style="height:14px;width:60%"></div>
+            <div class="skeleton" style="height:11px;width:55%"></div>
+          </div>
+        </div>
+
+        <div class="load-more-wrap" id="load-more-wrap" style="display:none;">
+          <button class="load-more-btn" id="load-more-btn" onclick="loadMore()">
+            Load more courses ↓
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- GRAPH PANEL (fills the graph-area absolutely, behind the overlays) -->
+    <section class="graph-panel" id="graph-panel">
+    <div class="graph-panel-header">
+      <div>
+        <div class="graph-panel-title">Knowledge Graph</div>
+        <div class="graph-panel-sub" id="graph-status">Loading graph...</div>
+      </div>
+    </div>
+    <div class="graph-legend" style="padding:8px 18px 6px;">
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#3b82f6;"></div>AI & Tech</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#f97316;"></div>Marketing</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#ef4444;"></div>Sales</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#8b5cf6;"></div>Leadership</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#22c55e;"></div>Finance</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#ec4899;"></div>HR</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#14b8a6;"></div>Healthcare</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#f59e0b;"></div>Legal</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#84cc16;"></div>ESG</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#0f766e;"></div>Proj Mgmt</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#06b6d4;"></div>Data</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#fbbf24;"></div>Comms</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#a16207;"></div>Wine</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#4ade80;"></div>Cannabis</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#e879f9;"></div>Creative</div>
+      <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#ffffff;opacity:0.6;"></div>Instructor</div>
+    </div>
+    <svg id="graph-canvas" role="img" aria-labelledby="graph-title graph-desc">
+      <title id="graph-title">eCornell Knowledge Graph</title>
+      <desc id="graph-desc">Force-directed network showing relationships between eCornell courses, programs, instructors, and subject domains. Use Tab to move between nodes, Enter to select, Arrow keys to navigate to connected nodes, Escape to clear selection.</desc>
+    </svg>
+    </section>
+    <div class="graph-tooltip" id="graph-tooltip"></div>
+
+  </div><!-- /graph-area -->
+
+  <!-- SIDEBAR FORM (25%) -->
+  <aside class="sidebar" id="sidebar">
+
+    <div class="sidebar-header">
+      <div class="sidebar-title">Build Your Learning Pathway</div>
+      <div class="sidebar-sub">Answer 5 questions · GraphRAG finds your courses in seconds</div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-steps">
+        <div class="progress-step active" id="ps-0"></div>
+        <div class="progress-step" id="ps-1"></div>
+        <div class="progress-step" id="ps-2"></div>
+        <div class="progress-step" id="ps-3"></div>
+        <div class="progress-step" id="ps-4"></div>
+      </div>
+      <div class="progress-label">
+        <span id="step-label">Step 1 of 5 — Career Vision</span>
+        <span id="step-pct">20%</span>
+      </div>
+    </div>
+
+    <!-- ─── STEP 1: Leadership Vision ─── -->
+    <div class="form-body">
+      <div class="step-block active" id="step-0">
+        <div class="step-section-label">Leadership Vision</div>
+
+        <div class="question-block">
+          <label class="question-label">What leadership role or strategic position are you building toward?</label>
+          <div class="question-hint">Be specific — title, sector, type of authority you want to hold.</div>
+          <textarea class="form-textarea" id="q1" placeholder="e.g. Chief AI Officer at a mid-market firm, or building a $10M AI strategy advisory practice for Fortune 500 boards…" rows="3"></textarea>
+        </div>
+
+        <div class="question-block">
+          <label class="question-label">What does your organization or practice look like in 2 years?</label>
+          <div class="question-hint">Team size, client calibre, scope of influence, revenue target.</div>
+          <textarea class="form-textarea" id="q2" placeholder="e.g. Leading AI transformation across 3 business units, managing a team of 15, advising 6 enterprise clients at $250K+ each…" rows="3"></textarea>
+        </div>
+
+        <div class="question-block">
+          <label class="question-label">What is the single biggest strategic bottleneck holding you back?</label>
+          <div class="question-hint">The one constraint — if removed — that unlocks everything else.</div>
+          <textarea class="form-textarea" id="q3" placeholder="e.g. I can execute AI strategy but struggle to build board-level conviction. I need the frameworks and credentials to lead that conversation." rows="3"></textarea>
+        </div>
+
+        <div class="rag-insight">
+          <div class="rag-insight-header">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+            How GraphRAG uses this
+          </div>
+          <p>Your vision is converted into a <code>1,536-dim</code> semantic vector via <code>text-embedding-3-large</code>. The graph measures cosine similarity against all 2,176 course descriptions in Supabase pgvector — then cross-references instructor specializations, program clusters, and industry signals. The more specific your language, the tighter the match radius.</p>
+        </div>
+      </div>
+
+      <!-- ─── STEP 2: Organization & Scope ─── -->
+      <div class="step-block" id="step-1">
+        <div class="step-section-label">Organization &amp; Scope</div>
+
+        <div class="question-block">
+          <label class="question-label">Who do you lead, serve, or influence?</label>
+          <div class="question-hint">Your organization, team, clients, or stakeholder ecosystem.</div>
+          <textarea class="form-textarea" id="q4" placeholder="e.g. C-suite at mid-market tech firms, a 200-person product engineering org, or 40 enterprise clients navigating AI adoption…" rows="3"></textarea>
+        </div>
+
+        <div class="question-block">
+          <label class="question-label">What AI or transformation challenges are you navigating right now?</label>
+          <div class="question-hint">The real problems on your desk — governance, culture, adoption, capability gaps.</div>
+          <textarea class="form-textarea" id="q5" placeholder="e.g. Getting leadership alignment on LLM deployment, building AI governance frameworks, upskilling a non-technical executive team…" rows="3"></textarea>
+        </div>
+
+        <div class="question-block">
+          <label class="question-label">What are you accountable for delivering?</label>
+          <div class="question-hint">The outcomes, decisions, or initiatives your name is attached to.</div>
+          <textarea class="form-textarea" id="q6" placeholder="e.g. $50M digital transformation roadmap, board AI strategy presentation, 3-year org capability plan, P&amp;L for an AI product line…" rows="2"></textarea>
+        </div>
+
+        <div class="rag-insight">
+          <div class="rag-insight-header">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+            How GraphRAG uses this
+          </div>
+          <p>Organizational context routes the graph to different program clusters. A CXO driving AI adoption and a founder building an advisory practice ask similar questions but need completely different courses. The graph cross-references your domain signals against instructor backgrounds and program specializations to separate those paths.</p>
+        </div>
+      </div>
+
+      <!-- ─── STEP 3: Revenue & Impact ─── -->
+      <div class="step-block" id="step-2">
+        <div class="step-section-label">Revenue &amp; Strategic Impact</div>
+
+        <div class="question-block">
+          <label class="question-label">Current compensation or revenue — and your target?</label>
+          <div class="question-hint">Calibrates the pathway to your specific income gap and timeline.</div>
+          <input type="text" class="form-input" id="q7" placeholder="e.g. Currently $280K TC → Target $500K+ in 24 months via exec role or advisory practice">
+        </div>
+
+        <div class="question-block">
+          <label class="question-label">How does your organization or practice generate value?</label>
+          <div class="question-hint">Internal P&amp;L, advisory retainers, equity, consulting, SaaS, board roles?</div>
+          <textarea class="form-textarea" id="q8" placeholder="e.g. Advisory retainers ($25K/month), keynote speaking, equity in portfolio AI companies, internal business unit P&amp;L…" rows="3"></textarea>
+        </div>
+
+        <div class="question-block">
+          <label class="question-label">What strategic initiative are you leading in the next 6 months?</label>
+          <div class="question-hint">This tells the system which courses deliver immediate leverage.</div>
+          <textarea class="form-textarea" id="q9" placeholder="e.g. Company-wide AI adoption program for 800 staff, launching an AI advisory practice, executive team upskilling on GenAI…" rows="2"></textarea>
+        </div>
+
+        <div class="rag-insight">
+          <div class="rag-insight-header">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+            How GraphRAG uses this
+          </div>
+          <p>Revenue model signals which courses deliver <em>90-day leverage</em> vs. <em>24-month positioning</em>. An AI governance framework course maps directly to your Q3 initiative, while an Executive MBA sequence maps to a future board role. The pathway balances both horizons — immediate ROI and long-term authority.</p>
+        </div>
+      </div>
+
+      <!-- ─── STEP 4: Credentials ─── -->
+      <div class="step-block" id="step-3">
+        <div class="step-section-label">Academic &amp; Credential Goals</div>
+
+        <div class="question-block">
+          <label class="question-label">What academic credentials are you pursuing or considering?</label>
+          <div class="question-hint">Cornell certificates, Executive MBA, graduate program, board designations?</div>
+          <textarea class="form-textarea" id="q10" placeholder="e.g. Stacking Cornell certificates toward an EMBA application. Considering ICD.D board designation or MIT Sloan Executive program." rows="3"></textarea>
+        </div>
+
+        <div class="question-block">
+          <label class="question-label">Target institution, geography, or program type?</label>
+          <div class="question-hint">If you're targeting a specific school, country, or credential pathway.</div>
+          <input type="text" class="form-input" id="q11" placeholder="e.g. Top-10 business school, US or Canada, experience-based admissions — no traditional undergrad required">
+        </div>
+
+        <div class="rag-insight">
+          <div class="rag-insight-header">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+            How GraphRAG uses this
+          </div>
+          <p>eCornell certificates stack toward Cornell University credentials recognized by top graduate admissions offices. This section filters the pathway for programs that build a credential portfolio — not just courses — engineered toward your specific institutional target and the authority level you're aiming for.</p>
+        </div>
+      </div>
+
+      <!-- ─── STEP 5: Context ─── -->
+      <div class="step-block" id="step-4">
+        <div class="step-section-label">Your Context</div>
+
+        <div class="question-block">
+          <label class="question-label">Where are you genuinely strong? What gaps are you aware of?</label>
+          <div class="question-hint">Strong areas are down-weighted so you're not recommended what you already know.</div>
+          <textarea class="form-textarea" id="q12" placeholder="e.g. Strong in AI strategy, stakeholder management, vision-setting. Gap in financial modeling, data science depth, academic research methods." rows="3"></textarea>
+        </div>
+
+        <div class="question-block">
+          <label class="question-label">Hours per week you can dedicate to structured learning?</label>
+          <div class="question-hint">Calibrates the phase timeline and module pacing to your calendar.</div>
+          <input type="text" class="form-input" id="q13" placeholder="e.g. 4–6 hours/week. Prefer 20–30 min modules I can do between meetings or on flights.">
+        </div>
+
+        <div class="question-block">
+          <label class="question-label">What do you want to be known for in your industry?</label>
+          <div class="question-hint">Your intellectual brand — the thing you want attached to your name at the highest level.</div>
+          <textarea class="form-textarea" id="q14" placeholder="e.g. The executive who built the AI governance playbook that became the industry standard — credentialed, not just opinionated." rows="3"></textarea>
+        </div>
+
+        <div class="rag-insight">
+          <div class="rag-insight-header">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+            How GraphRAG uses this
+          </div>
+          <p>Known domains are <em>down-weighted</em> in similarity ranking — you won't be recommended courses you've already mastered. Hours-per-week calibrates the phase timeline (3–8 months). Your desired intellectual brand becomes the north star: every course is evaluated against whether it builds toward that identity at the executive level.</p>
+        </div>
+      </div>
+
+    </div><!-- /form-body -->
+
+    <!-- Nav -->
+    <div class="form-nav" id="form-nav">
+      <button class="btn-back" id="btn-back" onclick="prevStep()" disabled>← Back</button>
+      <button class="btn-next" id="btn-next" onclick="nextStep()">
+        <span id="next-label">Next</span>
+        <span>→</span>
+      </button>
+    </div>
+
+  </aside><!-- /sidebar -->
+</div><!-- /layout -->
+
+<!-- ── PATHWAY MODAL ── -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="handleBackdropClick(event)">
+  <div class="modal" id="modal">
+
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-title">Your Pathway is Being Built</div>
+        <div class="modal-sub" id="modal-sub">GraphRAG is searching 2,176 courses across your profile…</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()" title="Close">✕</button>
+    </div>
+
+    <div class="modal-body" id="modal-body">
+
+      <!-- Confirmation state -->
+      <div id="confirm-state">
+        <div style="text-align:center;padding:28px 0 20px;">
+          <div style="width:56px;height:56px;background:rgba(179,27,27,0.15);border:2px solid rgba(179,27,27,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;">✓</div>
+          <h3 style="color:#fff;font-size:18px;font-weight:700;margin:0 0 8px;">Profile received</h3>
+          <p style="color:var(--muted);font-size:14px;line-height:1.6;max-width:420px;margin:0 auto;">GraphRAG is analyzing 2,176 Cornell courses against your profile. Enter your name and email — your personalized 6-phase pathway will be in your inbox within 10 minutes.</p>
+        </div>
+
+        <div style="max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:12px;">
+          <div>
+            <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500;">Your name</label>
+            <input type="text" id="confirm-name" placeholder="First name"
+              style="width:100%;padding:11px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:8px;color:#fff;font-family:inherit;font-size:14px;outline:none;"
+              onfocus="this.style.borderColor='rgba(179,27,27,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.14)'">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500;">Send pathway to</label>
+            <input type="email" id="confirm-email" placeholder="your@email.com"
+              style="width:100%;padding:11px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:8px;color:#fff;font-family:inherit;font-size:14px;outline:none;"
+              onfocus="this.style.borderColor='rgba(179,27,27,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.14)'"
+              onkeydown="if(event.key==='Enter') submitProfile()">
+          </div>
+          <button id="confirm-submit-btn" onclick="submitProfile()"
+            style="width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px;transition:background 0.2s;"
+            onmouseover="this.style.background='var(--red-dark)'" onmouseout="this.style.background='var(--red)'">
+            Send My Pathway →
+          </button>
+          <div id="confirm-status" style="text-align:center;font-size:12px;min-height:18px;"></div>
+        </div>
+
+        <div style="text-align:center;margin-top:20px;">
+          <button onclick="resetAndClose()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;">← Back to courses</button>
+        </div>
+      </div>
+
+      <!-- Success state (shown after submit) -->
+      <div id="success-state" style="display:none;text-align:center;padding:48px 24px;">
+        <div style="width:64px;height:64px;background:rgba(52,211,153,0.15);border:2px solid rgba(52,211,153,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:26px;">✓</div>
+        <h3 style="color:#fff;font-size:20px;font-weight:700;margin:0 0 12px;" id="success-name-msg">Check your inbox</h3>
+        <p style="color:var(--muted);font-size:14px;line-height:1.7;max-width:380px;margin:0 auto 28px;">Your personalized 6-phase eCornell learning pathway is on its way. Check your inbox in 10 minutes.</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+          <button onclick="resetAndClose()" style="padding:11px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">← Explore Courses</button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────
+// STATE
+// ──────────────────────────────────────────────
+let allCourses = [];
+let allPrograms = [];
+let filteredCourses = [];
+let displayedCount = 0;
+const PAGE_SIZE = 60;
+let currentStep = 0;
+const TOTAL_STEPS = 5;
+let currentView = 'grid';
+
+const STEP_LABELS = [
+  'Step 1 of 5 — Career Vision',
+  'Step 2 of 5 — Work & Clients',
+  'Step 3 of 5 — Revenue & Business',
+  'Step 4 of 5 — Credentials',
+  'Step 5 of 5 — Your Context',
+];
+
+// ──────────────────────────────────────────────
+// LOAD DATA
+// ──────────────────────────────────────────────
+async function loadData() {
+  try {
+    const res = await fetch('courses_lite.json');
+    const data = await res.json();
+    allCourses = data.courses;
+    allPrograms = data.programs;
+
+    // Populate program filter
+    const select = document.getElementById('program-filter');
+    allPrograms.slice(0, 200).forEach(p => {  // cap at 200 for UX
+      const opt = document.createElement('option');
+      opt.value = p; opt.textContent = p;
+      select.appendChild(opt);
+    });
+
+    // Stats
+    document.getElementById('total-courses').textContent = allCourses.length.toLocaleString();
+    document.getElementById('total-programs').textContent = allPrograms.length.toLocaleString();
+
+    // Initial render
+    filteredCourses = [...allCourses];
+    renderCourses();
+  } catch(e) {
+    console.error('Failed to load courses:', e);
+    document.getElementById('course-grid').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚠</div>
+        <h3>Couldn't load course data</h3>
+        <p>Run <code>python -m http.server 8080</code> from the Learning folder and open <code>http://localhost:8080</code></p>
+      </div>`;
+  }
+}
+
+// ──────────────────────────────────────────────
+// RENDER COURSES
+// ──────────────────────────────────────────────
+function closeCatalog() {
+  window._graphFilter = null;
+  document.getElementById('search-input').value = '';
+  document.getElementById('program-filter').value = '';
+  if (ragMode) clearRagSearch();
+  else applyFilters();
+  document.getElementById('catalog').classList.remove('open');
+}
+
+function _updateCatalogVisibility() {
+  if (window.innerWidth <= 768) return; // mobile handled via CSS classes
+  const q = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+  const prog = document.getElementById('program-filter')?.value || '';
+  const hasFilter = q || prog || window._graphFilter || ragMode;
+  const catalog = document.getElementById('catalog');
+  if (catalog) {
+    catalog.classList.toggle('open', !!(hasFilter && filteredCourses.length > 0));
+  }
+}
+
+function renderCourses(reset = true) {
+  const grid = document.getElementById('course-grid');
+  if (reset) {
+    displayedCount = 0;
+    grid.innerHTML = '';
+  }
+
+  const start = displayedCount;
+  const end = Math.min(start + PAGE_SIZE, filteredCourses.length);
+  const frag = document.createDocumentFragment();
+
+  for (let i = start; i < end; i++) {
+    const c = filteredCourses[i];
+    const card = createCard(c);
+    frag.appendChild(card);
+  }
+
+  grid.appendChild(frag);
+  displayedCount = end;
+
+  // Count
+  document.getElementById('count-display').textContent =
+    filteredCourses.length.toLocaleString();
+
+  // Load more
+  const lmw = document.getElementById('load-more-wrap');
+  if (displayedCount < filteredCourses.length) {
+    lmw.style.display = 'block';
+    document.getElementById('load-more-btn').textContent =
+      `Load more (${filteredCourses.length - displayedCount} remaining) ↓`;
+  } else {
+    lmw.style.display = 'none';
+  }
+
+  // Toggle catalog panel visibility (desktop only)
+  _updateCatalogVisibility();
+}
+
+function createCard(c) {
+  const div = document.createElement('div');
+  div.className = 'course-card';
+  div.dataset.id = c.id;
+
+  const programColor = getProgramColor(c.program);
+
+  const simPct = c.similarity ? Math.round(c.similarity * 100) : 0;
+  const simBadge = c._rag
+    ? `<span style="margin-left:auto;font-size:10px;font-weight:700;color:${simPct>50?'#16a34a':simPct>35?'#ca8a04':'var(--muted)'};">${simPct}% match</span>`
+    : '';
+
+  div.innerHTML = `
+    <a class="card-link" href="${escHtml(c.url || '#')}" target="_blank" rel="noopener" title="Open course">↗</a>
+    <div class="card-program" style="background:${programColor.bg};color:${programColor.text};border-color:${programColor.border};">${escHtml(truncate(c.program, 40))}</div>
+    <div class="card-title">${escHtml(c.title)}</div>
+    <div class="card-instructor" style="display:flex;align-items:center;gap:4px;">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      ${escHtml(c.instructor || '—')}
+      ${simBadge}
+    </div>
+    <div class="card-match${c._rag ? ' visible' : ''}"><div class="card-match-bar" style="width:${c._rag ? simPct : 0}%"></div></div>`;
+
+  if (c._rag && simPct > 40) div.classList.add('highlighted');
+
+  // Clicking the card opens the course URL (↗ link is hover-only; whole card should work)
+  if (c.url) {
+    div.style.cursor = 'pointer';
+    div.addEventListener('click', e => {
+      // Don't double-fire if user clicked the card-link anchor directly
+      if (e.target.closest('a')) return;
+      window.open(c.url, '_blank', 'noopener');
+    });
+  }
+
+  return div;
+}
+
+// Program color palette (deterministic from program name)
+function getProgramColor(program) {
+  const palettes = [
+    { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' },
+    { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+    { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
+    { bg: '#fefce8', text: '#854d0e', border: '#fef08a' },
+    { bg: '#fdf4ff', text: '#7e22ce', border: '#e9d5ff' },
+    { bg: '#f0fdfa', text: '#0f766e', border: '#99f6e4' },
+    { bg: '#fff7ed', text: '#c2410c', border: '#fed7aa' },
+    { bg: '#f8fafc', text: '#475569', border: '#e2e8f0' },
+  ];
+  let hash = 0;
+  for (let i = 0; i < (program||'').length; i++) hash = (hash * 31 + program.charCodeAt(i)) & 0xffff;
+  return palettes[hash % palettes.length];
+}
+
+function loadMore() { renderCourses(false); }
+
+function setView(v) {
+  currentView = v;
+  const grid = document.getElementById('course-grid');
+  grid.className = 'course-grid' + (v === 'list' ? ' list-view' : '');
+  document.getElementById('grid-btn').className = 'view-btn' + (v === 'grid' ? ' active' : '');
+  document.getElementById('list-btn').className = 'view-btn' + (v === 'list' ? ' active' : '');
+}
+
+// ──────────────────────────────────────────────
+// SEARCH & FILTER
+// ──────────────────────────────────────────────
+let searchTimer = null;
+
+function handleSearch(val) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => applyFilters(), 200);
+}
+
+function handleFilter() { applyFilters(); }
+
+function applyFilters() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  const prog = document.getElementById('program-filter').value;
+  const gf = window._graphFilter; // { type:'domain', domainId, programs: Set }
+
+  filteredCourses = allCourses.filter(c => {
+    const matchQ = !q ||
+      c.title.toLowerCase().includes(q) ||
+      (c.program||'').toLowerCase().includes(q) ||
+      (c.instructor||'').toLowerCase().includes(q);
+    const matchP = !prog || c.program === prog;
+    let matchGF = true;
+    if (gf) {
+      if (gf.type === 'domain')     matchGF = gf.programs.has(c.program);
+      else if (gf.type === 'program')    matchGF = c.program === gf.programName;
+      else if (gf.type === 'instructor') matchGF = c.instructor === gf.instructorName;
+    }
+    return matchQ && matchP && matchGF;
+  });
+
+  renderCourses();
+  if (window.graphHighlight) window.graphHighlight(q, prog, gf);
+}
+
+// ──────────────────────────────────────────────
+// FORM NAVIGATION
+// ──────────────────────────────────────────────
+function updateProgress() {
+  for (let i = 0; i < TOTAL_STEPS; i++) {
+    const s = document.getElementById(`ps-${i}`);
+    if (i < currentStep) s.className = 'progress-step done';
+    else if (i === currentStep) s.className = 'progress-step active';
+    else s.className = 'progress-step';
+  }
+  document.getElementById('step-label').textContent = STEP_LABELS[currentStep];
+  document.getElementById('step-pct').textContent = `${Math.round((currentStep+1)/TOTAL_STEPS*100)}%`;
+  document.getElementById('btn-back').disabled = currentStep === 0;
+  document.getElementById('next-label').textContent = currentStep === TOTAL_STEPS - 1 ? 'Generate Pathway' : 'Next';
+}
+
+function showStep(n) {
+  document.querySelectorAll('.step-block').forEach((el, i) => {
+    el.className = 'step-block' + (i === n ? ' active' : '');
+  });
+  currentStep = n;
+  updateProgress();
+}
+
+function nextStep() {
+  if (currentStep < TOTAL_STEPS - 1) {
+    showStep(currentStep + 1);
+    // Live highlight based on answers so far
+    liveHighlight();
+  } else {
+    generatePathway();
+  }
+}
+
+function prevStep() {
+  if (currentStep > 0) showStep(currentStep - 1);
+}
+
+function scrollSidebar() {
+  if (window.innerWidth <= 768) {
+    switchTab('pathway');
+    setTimeout(() => document.getElementById('q1')?.focus(), 100);
+    return;
+  }
+  // Sidebar is always visible on desktop — just scroll to top and focus
+  document.getElementById('sidebar')?.scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById('q1')?.focus();
+}
+
+// ──────────────────────────────────────────────
+// LIVE HIGHLIGHT — highlight courses based on form answers
+// ──────────────────────────────────────────────
+function liveHighlight() {
+  const q1 = (document.getElementById('q1').value || '').toLowerCase();
+  const q2 = (document.getElementById('q2').value || '').toLowerCase();
+  const q4 = (document.getElementById('q4').value || '').toLowerCase();
+  const q9 = (document.getElementById('q9').value || '').toLowerCase();
+  const q14 = (document.getElementById('q14').value || '').toLowerCase();
+
+  const terms = [...new Set(
+    [q1, q2, q4, q9, q14]
+      .join(' ')
+      .split(/\s+/)
+      .filter(w => w.length > 3 && !stopWords.has(w))
+      .slice(0, 12)
+  )];
+
+  if (terms.length === 0) return;
+
+  document.querySelectorAll('.course-card').forEach(card => {
+    const id = card.dataset.id;
+    const course = allCourses.find(c => c.id === id);
+    if (!course) return;
+
+    const txt = `${course.title} ${course.program} ${course.instructor}`.toLowerCase();
+    let score = 0;
+    terms.forEach(t => { if (txt.includes(t)) score++; });
+    const pct = Math.min(score / Math.max(terms.length, 1), 1);
+
+    const matchDiv = card.querySelector('.card-match');
+    const bar = card.querySelector('.card-match-bar');
+    if (pct > 0) {
+      matchDiv.classList.add('visible');
+      bar.style.width = `${pct * 100}%`;
+      card.classList.toggle('highlighted', pct >= 0.3);
+    }
+  });
+}
+
+// ──────────────────────────────────────────────
+// MODAL
+// ──────────────────────────────────────────────
+function openModal() {
+  document.getElementById('modal-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function handleBackdropClick(e) {
+  if (e.target === document.getElementById('modal-backdrop')) closeModal();
+}
+function resetAndClose() { closeModal(); resetForm(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ──────────────────────────────────────────────
+// GENERATE PATHWAY — opens modal, streams via Claude CLI
+// ──────────────────────────────────────────────
+let currentAnswers = {};
+let pathwayFullText = '';
+
+async function generatePathway() {
+  currentAnswers = {
+    q1: val('q1'), q2: val('q2'), q3: val('q3'),
+    q4: val('q4'), q5: val('q5'), q6: val('q6'),
+    q7: val('q7'), q8: val('q8'), q9: val('q9'),
+    q10: val('q10'), q11: val('q11'),
+    q12: val('q12'), q13: val('q13'), q14: val('q14'),
+  };
+
+  // Reset confirmation state
+  document.getElementById('confirm-state').style.display = '';
+  document.getElementById('success-state').style.display = 'none';
+  document.getElementById('confirm-name').value = '';
+  document.getElementById('confirm-email').value = '';
+  document.getElementById('confirm-status').textContent = '';
+  document.getElementById('confirm-submit-btn').disabled = false;
+  document.getElementById('confirm-submit-btn').textContent = 'Send My Pathway →';
+
+  openModal();
+}
+
+// ──────────────────────────────────────────────
+// SUBMIT PROFILE — confirmation form handler
+// ──────────────────────────────────────────────
+async function submitProfile() {
+  const name = document.getElementById('confirm-name').value.trim();
+  const email = document.getElementById('confirm-email').value.trim();
+  const status = document.getElementById('confirm-status');
+  const btn = document.getElementById('confirm-submit-btn');
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!name || name.length < 2) { status.style.color = '#f87171'; status.textContent = 'Please enter your name.'; document.getElementById('confirm-name').focus(); return; }
+  if (!email || !emailRegex.test(email)) { status.style.color = '#f87171'; status.textContent = 'Please enter a valid email address.'; document.getElementById('confirm-email').focus(); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  status.style.color = 'var(--muted)';
+  status.textContent = '';
+
+  try {
+    const resp = await fetch('/api/submit-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...currentAnswers, name, email }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      document.getElementById('confirm-state').style.display = 'none';
+      document.getElementById('success-name-msg').textContent = `Check your inbox, ${name}`;
+      document.getElementById('success-state').style.display = '';
+    } else {
+      throw new Error(data.error || 'Submission failed');
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Send My Pathway →';
+    status.style.color = '#f87171';
+    status.textContent = `Error: ${e.message}`;
+  }
+}
+
+// ──────────────────────────────────────────────
+// RAG SEMANTIC SEARCH
+// ──────────────────────────────────────────────
+let ragMode = false;
+
+async function runRagSearch() {
+  const query = document.getElementById('rag-search-input').value.trim();
+  if (!query) return;
+
+  const btn = document.getElementById('rag-search-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;animation:spin 0.8s linear infinite">⟳</span> Searching…';
+
+  try {
+    const resp = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, limit: 40 }),
+    });
+    const data = await resp.json();
+
+    // ── Course results ──
+    ragMode = true;
+    filteredCourses = data.results.map((r, i) => ({
+      id: `rag:${i}`,
+      title: r.title,
+      program: r.program,
+      instructor: r.instructor,
+      url: r.url,
+      similarity: r.similarity,
+      _rag: true,
+    }));
+    renderCourses();
+
+    // ── Status bar ──
+    document.getElementById('rag-q-display').textContent = `"${query}"`;
+    document.getElementById('rag-results-bar').classList.add('visible');
+
+    // ── Graph context panel ──
+    const gc = data.graph_context || {};
+    const panel      = document.getElementById('graph-context-panel');
+    const summaryEl  = document.getElementById('graph-context-summary');
+    const chipsEl    = document.getElementById('graph-context-chips');
+    const statEl     = document.getElementById('graph-expanded-stat');
+
+    const communities    = gc.communities    || [];
+    const relatedProgs   = gc.related_programs || [];
+    const bridges        = gc.bridges        || [];
+    const expandedCount  = gc.expanded_count || 0;
+
+    if (communities.length || relatedProgs.length) {
+      // Community insight (first matched community summary)
+      const topComm = communities.find(c => c.summary);
+      summaryEl.textContent = topComm ? topComm.summary : '';
+      summaryEl.style.display = topComm ? 'block' : 'none';
+
+      // Stat
+      statEl.textContent = expandedCount ? `· explored ${expandedCount} programs` : '';
+
+      // Chips: related programs (clickable → text filter) + bridges (yellow)
+      chipsEl.innerHTML = '';
+      relatedProgs.forEach(p => {
+        const chip = document.createElement('span');
+        chip.className = 'graph-chip';
+        chip.textContent = p;
+        chip.onclick = () => {
+          document.getElementById('search-input').value = p;
+          clearRagSearch();
+          applyFilters();
+        };
+        chipsEl.appendChild(chip);
+      });
+      bridges.forEach(p => {
+        const chip = document.createElement('span');
+        chip.className = 'graph-chip bridge';
+        chip.title = 'Cross-domain bridge program';
+        chip.textContent = '⟷ ' + p;
+        chip.onclick = () => {
+          document.getElementById('search-input').value = p;
+          clearRagSearch();
+          applyFilters();
+        };
+        chipsEl.appendChild(chip);
+      });
+
+      panel.classList.add('visible');
+
+      // ── Highlight graph nodes matching the search ──
+      if (window.graphHighlight) {
+        window.graphHighlight(query.toLowerCase(), '', null);
+      }
+    } else {
+      panel.classList.remove('visible');
+    }
+
+    document.getElementById('catalog').scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch(e) {
+    console.error('RAG search failed:', e);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> Search';
+  }
+}
+
+function clearRagSearch() {
+  ragMode = false;
+  document.getElementById('rag-search-input').value = '';
+  document.getElementById('rag-results-bar').classList.remove('visible');
+  document.getElementById('graph-context-panel').classList.remove('visible');
+  if (window.graphHighlight) window.graphHighlight('', '', null);
+  applyFilters();
+}
+
+// Add spin animation
+const style = document.createElement('style');
+style.textContent = '@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }';
+document.head.appendChild(style);
+
+// ──────────────────────────────────────────────
+// Minimal markdown → HTML (headers, bold, italic, bullets, hr, links)
+function renderMarkdown(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^#### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^---+$/gm,'<hr>')
+    .replace(/^\s*[-•]\s+(.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .replace(/\[(.+?)\]\((https?:\/\/.+?)\)/g,'<a href="$2" target="_blank" rel="noopener">$1 ↗</a>')
+    .replace(/\n\n/g,'<br><br>');
+}
+
+function searchFromChip(q) {
+  document.getElementById('search-input').value = q;
+  applyFilters();
+  document.getElementById('catalog')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetForm() {
+  currentStep = 0;
+  document.querySelector('.form-body').style.display = '';
+  document.getElementById('form-nav').style.display = '';
+  document.querySelector('.progress-wrap').style.display = '';
+  document.getElementById('modal-backdrop').classList.remove('open');
+  document.body.style.overflow = '';
+  pathwayFullText = '';
+  showStep(0);
+  ['q1','q2','q3','q4','q5','q6','q7','q8','q9','q10','q11','q12','q13','q14']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.querySelectorAll('.course-card').forEach(c => {
+    c.classList.remove('highlighted');
+    const bar = c.querySelector('.card-match-bar');
+    if(bar) bar.style.width = '0%';
+    const matchDiv = c.querySelector('.card-match');
+    if(matchDiv) matchDiv.classList.remove('visible');
+  });
+}
+
+
+// ──────────────────────────────────────────────
+// HELPERS
+// ──────────────────────────────────────────────
+function val(id) { return (document.getElementById(id)?.value || '').trim(); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return String(s).replace(/'/g,"\\'"); }
+function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '…' : (s || ''); }
+
+const stopWords = new Set(['with','from','that','this','have','they','what','your','will','been','were','when','which','their','there','about','into','through','during','before','after','above','below','between','each','more','most','other','some','such','than','then','these','those','under','where','while','would','could','should','built','want','work','build','help','make','take','need','know','like','just','only','also','even','well','very','much','many','over','both','back','good','best','real','high','full','long','used','same','next','last','first','part','most','own','very','just','also','over','much','only','even','such','well','both','back','good','best','real','high','full','long']);
+
+// ──────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  updateProgress();
+  document.querySelectorAll('.form-textarea, .form-input').forEach(el => {
+    el.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(liveHighlight, 400);
+    });
+  });
+});
+</script>
+
+<!-- D3.js for Knowledge Graph -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script>
+// ── Domain color map — keyword-based ──
+const DOMAIN_MAP = [
+  // Expanded to classify 267 formerly-"Other" programs into proper domains.
+  // 3 new domains added: Wine & Viticulture, Cannabis & Hemp, Creative Arts & Film.
+  // Existing domains expanded with keywords to absorb remaining programs.
+
+  { keys: ['ai ','artificial intelligence','machine learning','cybersecurity','cyber','digital transformation','technology','data science','algorithm','automation','robotics','blockchain','cloud','5g','deepfake','telemedicine','fintech'],
+    color: '#3b82f6', label: 'AI & Technology' },
+
+  { keys: ['marketing','brand','advertising','content','seo','social media','digital media','campaign','consumer','market research','public relations','pr ','copywriting','fashion','targeting','segmentation','customer journey','positioning','pricing strategy'],
+    color: '#f97316', label: 'Marketing & Sales' },
+
+  { keys: ['sales','revenue','business development','negotiation','crm','account management','pipeline','cold calling','key account','winning with'],
+    color: '#ef4444', label: 'Sales & Revenue' },
+
+  { keys: ['leadership','executive','strategic','strategy','organizational','influence','decision','coaching','mentoring','change management','culture','vision','public sector','systems thinking','systemic','vuca','adaptive','leading','courage','humility','credibility','authority','accountability','ancient rome','happiness as a leader'],
+    color: '#8b5cf6', label: 'Leadership & Strategy' },
+
+  { keys: ['finance','financial','accounting','investment','portfolio','budget','cash flow','valuation','equity','capital','tax','audit','balance sheet','p&l','economic','economics','monopoly','equilibrium','scarcity','mergers','synergies','securities','fintech trends','time value of money','stock','fiduciary'],
+    color: '#22c55e', label: 'Finance & Accounting' },
+
+  { keys: ['human resources','hr ','hiring','recruitment','dei','diversity','inclusion','talent','compensation','workforce','employee','performance management','people','behavioral science','emotion','emotional intelligence','mediation','counseling','bias','eliciting','onboarding','labor relations','engagement','family relationships'],
+    color: '#ec4899', label: 'HR & People' },
+
+  { keys: ['healthcare','health ','medical','clinical','nursing','patient','pharma','public health','hospital','wellness','obesity','nutrition','cancer','immunity','medicinal plant','senior living','metabolic','cardiovascular','digestive','skin health','atherosclerosis','endocannabinoid','food allergy','plant-based','herbal','botanical medicine','bones','reproductive'],
+    color: '#14b8a6', label: 'Healthcare' },
+
+  { keys: ['law','legal','compliance','regulatory','regulation','antitrust','contract','intellectual property','privacy','ethics','governance','trade secret','trademark','patent','securities registration','jury','litigation','international agreement','rule system','policing','rule design','violations'],
+    color: '#f59e0b', label: 'Legal & Compliance' },
+
+  { keys: ['sustainability','climate','esg','environmental','green','carbon','energy','renewable','social impact','nonprofit','csr','preservation','historic preservation','agriculture','horticulture','plant selection','soil','insects','weeds','outdoor cultivation','site assessment','planting plan','sustainable','human rights'],
+    color: '#84cc16', label: 'Sustainability & ESG' },
+
+  { keys: ['project management','agile','scrum','operations','supply chain','process','logistics','quality','lean','six sigma','program management','project risk','project pitch','monitoring project','project team','project outcomes','scope','organizing project','resource planning'],
+    color: '#0f766e', label: 'Project Management' },
+
+  { keys: ['entrepreneur','startup','venture','innovation','product design','product engineering','product prototype','business model','ideation','incubator','beverage','beer','brewing','craft','hops','yeast','fermentation','water profile','commercialization','pitching','feasibility','emerging market','value proposition','distribution channel'],
+    color: '#f43f5e', label: 'Entrepreneurship' },
+
+  { keys: ['communication','writing','presentation','public speaking','conflict','feedback','listening','negotiating','storytell','podcast','op-ed','narrative','persuasive speaking','media support','dialogue','subtext','voice and point','slide deck','slides for impact','convincing case'],
+    color: '#fbbf24', label: 'Communication' },
+
+  { keys: ['data ','analytics','statistics','quantitative','visualization','bi ','business intelligence','tableau','excel','python','sql','statistical','regression','hypothesis testing','sampling','forecasting','probability','queueing','multivariable','distributions','econometric','market response modeling','interpreting data'],
+    color: '#06b6d4', label: 'Data & Analytics' },
+
+  { keys: ['real estate','property','construction','facility','senior facilit'],
+    color: '#a78bfa', label: 'Real Estate' },
+
+  { keys: ['education','teaching','learning','curriculum','academic','university','training'],
+    color: '#c026d3', label: 'Education' },
+
+  // ── NEW DOMAINS ──────────────────────────────────────────────────────────
+  { keys: ['wine','vineyard','viticulture','grape varietals','winery','oenology','sommelier','wine production','evaluating wine','wine essentials','wine ingredient'],
+    color: '#a16207', label: 'Wine & Viticulture' },      // warm brown — evokes wine/oak barrels
+
+  { keys: ['cannabis','hemp','cannabinoid','endocannabinoid system','marijuana','cbd','hemp biology','hemp genetics','hemp breeding','hemp propagation','hemp cultivation','hemp market','cannabis legislation','cannabis production'],
+    color: '#4ade80', label: 'Cannabis & Hemp' },          // bright green — evokes the plant
+
+  { keys: ['photography','cinematography','film','camera','lighting','scene','screenplay','image and action','world-building','character development','creative writing','dialogue','voice and point of view','creative arts','visual storytelling','style and expression','professional photography'],
+    color: '#e879f9', label: 'Creative Arts & Film' },    // fuchsia — distinct from all other domains
+];
+
+function getDomainColor(programName) {
+  if (!programName) return '#64748b';
+  const lower = programName.toLowerCase();
+  for (const d of DOMAIN_MAP) {
+    if (d.keys.some(k => lower.includes(k))) return d.color;
+  }
+  return '#64748b'; // slate fallback
+}
+
+(function initGraph() {
+  const svg = document.getElementById('graph-canvas');
+  if (!svg) return;
+
+  const tooltip = document.getElementById('graph-tooltip');
+
+  fetch('graph.json')
+    .then(r => r.json())
+    .then(data => {
+      const allNodes = data.nodes;
+      const allLinks = data.links;
+
+      // ── All nodes — no cap ───────────────────────────────────────────────
+      const courseNodes   = allNodes.filter(n => n.type === 'course');
+      const programs      = allNodes.filter(n => n.type === 'program');
+      const instructors   = allNodes.filter(n => n.type === 'instructor');
+      const domains       = allNodes.filter(n => n.type === 'domain');
+
+      const courseIdSet   = new Set(courseNodes.map(n => n.id));
+      const includedIds   = new Set(allNodes.map(n => n.id));
+
+      // Force links: everything except TOPIC_OVERLAP (cross-course similarities
+      // point outside the visible set and crash D3 when nodes aren't found).
+      // These links drive the clustering positions of all 3100+ nodes.
+      const links = allLinks.filter(l =>
+        l.relation !== 'TOPIC_OVERLAP' &&
+        includedIds.has(l.source) && includedIds.has(l.target)
+      );
+
+      // Visual links: only the structural hierarchy (BELONGS_TO course→program
+      // and BELONGS_TO_DOMAIN program→domain). Rendering all ~7k force links
+      // as lines produces an unreadable tangle — SHARES_INSTRUCTOR and TAUGHT_BY
+      // are used for positioning only and are not drawn.
+      const visualLinks = links.filter(l =>
+        l.relation === 'BELONGS_TO' || l.relation === 'BELONGS_TO_DOMAIN'
+      );
+
+      const nodes = [...domains, ...programs, ...instructors, ...courseNodes];
+
+      document.getElementById('graph-status').textContent =
+        `${domains.length} domains · ${programs.length} programs · ${instructors.length} instructors · ${courseNodes.length} courses`;
+
+      // ── Lookup maps for click filtering ──
+      // course id → program name
+      const courseProgramMap = {};
+      const courseInstructorMap = {};
+      allLinks.forEach(l => {
+        if (l.relation === 'BELONGS_TO')
+          courseProgramMap[l.source] = l.target.replace('program:', '');
+        if (l.relation === 'TAUGHT_BY')
+          courseInstructorMap[l.source] = l.target.replace('instructor:', '');
+      });
+      // program node id → program name
+      const programNameMap = {};
+      programs.forEach(n => { programNameMap[n.id] = n.name || n.id.replace('program:', ''); });
+      // instructor node id → instructor name
+      const instructorNameMap = {};
+      instructors.forEach(n => { instructorNameMap[n.id] = n.name || n.id.replace('instructor:', ''); });
+
+      // ── SVG setup ──
+      // svg is inside graph-panel (position:absolute;inset:0) inside graph-area (flex:1).
+      // getBoundingClientRect() reflects the actual rendered size — reliable after fetch.
+      const graphArea = document.getElementById('graph-area');
+      const gpRect    = document.getElementById('graph-panel')?.getBoundingClientRect();
+      const isMobile  = window.innerWidth <= 768;
+      const headerH   = 72;
+      const W = gpRect && gpRect.width  > 10 ? gpRect.width  :
+                graphArea && graphArea.clientWidth  > 10 ? graphArea.clientWidth  :
+                isMobile ? window.innerWidth : window.innerWidth * 0.70;
+      const H = gpRect && gpRect.height > 10 ? gpRect.height :
+                graphArea && graphArea.clientHeight > 10 ? graphArea.clientHeight :
+                window.innerHeight - headerH;
+
+      const d3svg = d3.select(svg)
+        .attr('width',  W).attr('height', H)
+        .style('background', '#0a0f1a')
+        .style('overflow', 'hidden');
+
+      const g = d3svg.append('g');
+
+      let currentK = 1;
+      const zoomBehavior = d3.zoom().scaleExtent([0.2, 6]).on('zoom', e => {
+        g.attr('transform', e.transform);
+        currentK = e.transform.k;
+        updateLabelScale();
+      });
+      d3svg.call(zoomBehavior);
+
+      // Pre-position nodes centred on the canvas — prevents top-left pile-up on load.
+      const CX = W / 2, CY = H / 2;
+      const domainNodesList = nodes.filter(d => d.type === 'domain');
+      domainNodesList.forEach((d, i) => {
+        const angle = (i / domainNodesList.length) * 2 * Math.PI;
+        d.x = CX + Math.cos(angle) * 380;
+        d.y = CY + Math.sin(angle) * 300;
+      });
+      nodes.filter(d => d.type !== 'domain').forEach(d => {
+        d.x = CX + (Math.random() - 0.5) * 600;
+        d.y = CY + (Math.random() - 0.5) * 500;
+      });
+
+      const initScale = Math.min(0.95 * W / 800, 0.95 * H / 650, 0.28);
+
+      const nodeRadius = { domain: 16, program: 7, course: 3, instructor: 4 };
+
+      // Pre-compute domain color per node
+      function nodeColor(d) {
+        if (d.type === 'instructor') return '#ffffff';
+        if (d.type === 'domain') return getDomainColor(d.name || '');
+        const progName = d.type === 'program'
+          ? (programNameMap[d.id] || d.name || '')
+          : (courseProgramMap[d.id] || '');
+        return getDomainColor(progName);
+      }
+
+      // Performance tuning for 3100+ nodes:
+      // alphaDecay 0.035 → ~80 ticks to settle (fast enough, thorough enough).
+      // velocityDecay 0.5 → natural damping.
+      // Stronger repulsion + longer link distances → more breathing room between clusters.
+      // Weaker centering forces (0.06/0.02) → clusters fan out instead of bunching center.
+      const sim = d3.forceSimulation(nodes)
+        .alphaDecay(0.035)
+        .velocityDecay(0.5)
+        .force('link', d3.forceLink(links)
+          .id(d => d.id)
+          .distance(d => {
+            // Domain hubs far from programs — creates wide clusters with breathing room
+            if (d.relation === 'BELONGS_TO_DOMAIN') return 220;
+            // Courses stay tight around their program parent
+            if (d.relation === 'BELONGS_TO') return 28;
+            if (d.relation === 'TAUGHT_BY') return 32;
+            // Same-domain & shared-instructor: SHORT distance = pulls programs into tight clusters
+            if (d.relation === 'SHARES_INSTRUCTOR') return 55;
+            if (d.relation === 'SAME_DOMAIN') return 40;
+            return 45;
+          })
+          .strength(d => {
+            if (d.relation === 'BELONGS_TO_DOMAIN') return 0.9;
+            if (d.relation === 'BELONGS_TO') return 0.8;
+            if (d.relation === 'TAUGHT_BY') return 0.3;
+            // Strong pull on within-cluster links = tight clusters
+            if (d.relation === 'SAME_DOMAIN') return 0.5;
+            if (d.relation === 'SHARES_INSTRUCTOR') return 0.35;
+            return 0.1;
+          }))
+        .force('charge', d3.forceManyBody()
+          // Domains push each other hard = clear separation between cluster groups
+          .strength(d => d.type === 'domain' ? -600 : d.type === 'program' ? -75 : d.type === 'instructor' ? -20 : -5)
+          .distanceMax(500))
+        // Moderate centering — keeps the layout from drifting off into infinity.
+        // Auto-fit zoom after settle handles final framing, not these forces.
+        .force('x', d3.forceX(W / 2).strength(d => d.type === 'domain' ? 0.08 : d.type === 'program' ? 0.025 : 0.006))
+        .force('y', d3.forceY(H / 2).strength(d => d.type === 'domain' ? 0.08 : d.type === 'program' ? 0.025 : 0.006))
+        .force('collision', d3.forceCollide(d => d.type === 'course' ? 4 : d.type === 'program' ? 8 : (nodeRadius[d.type] || 6) + 4));
+
+      const link = g.append('g')
+        .selectAll('line').data(visualLinks).join('line')
+        .attr('stroke', d => {
+          if (d.relation === 'TAUGHT_BY') return 'rgba(255,255,255,0.28)'; // was 0.12 — failed 3:1 contrast
+          const src = typeof d.source === 'object' ? d.source : { id: d.source };
+          const col = getDomainColor(courseProgramMap[src.id] || '');
+          return col + '60'; // was '40' (25%) → now '60' (38%) for better contrast
+        })
+        .attr('stroke-width', 1.0); // was 0.8 — sub-pixel on high-DPI
+
+      const node = g.append('g')
+        .selectAll('circle').data(nodes).join('circle')
+        .attr('r', d => nodeRadius[d.type] || 3)
+        .attr('fill', d => nodeColor(d))
+        .attr('fill-opacity', d =>
+          d.type === 'domain' ? 0.25 :
+          d.type === 'instructor' ? 0.55 :
+          d.type === 'course' ? 0.65 : 0.85)
+        .attr('stroke', d =>
+          d.type === 'domain' ? nodeColor(d) :
+          d.type === 'program' ? nodeColor(d) :
+          d.type === 'instructor' ? 'rgba(255,255,255,0.4)' : 'none')
+        .attr('stroke-width', d =>
+          d.type === 'domain' ? 2.5 :
+          d.type === 'program' ? 1.5 :
+          d.type === 'instructor' ? 0.8 : 0)
+        .style('cursor', 'pointer')
+        .call(d3.drag()
+          // Propagation drag: the dragged node moves at 100%, direct neighbors at 80%,
+          // 2-hop at 55%, 3-hop at 32%, 4-hop at 16%, 5-hop at 7%, 6-hop at 3%.
+          // All nodes stay pinned (fx/fy) during drag for immediate response — no physics lag.
+          // On release, unpin everything and let simulation settle naturally.
+          .on('start', (e, d) => {
+            d._wasDragged = false; d._dragX0 = e.x; d._dragY0 = e.y;
+            d._prevDragX = e.x; d._prevDragY = e.y;
+            d.fx = d.x; d.fy = d.y;
+            // Pre-compute graph distances from this node (up to 6 hops)
+            d._dragDists = bfsDistances(d.id, 6);
+          })
+          .on('drag', (e, d) => {
+            if (!d._wasDragged && Math.hypot(e.x - d._dragX0, e.y - d._dragY0) > 4) {
+              d._wasDragged = true;
+            }
+            if (d._wasDragged) {
+              const dx = e.x - d._prevDragX;
+              const dy = e.y - d._prevDragY;
+              d._prevDragX = e.x; d._prevDragY = e.y;
+              d.fx = e.x; d.fy = e.y;
+
+              // Propagate displacement to all connected nodes — falloff by graph distance
+              const falloff = [1, 0.80, 0.55, 0.32, 0.16, 0.07, 0.03];
+              nodes.forEach(n => {
+                if (n === d) return;
+                const depth = d._dragDists[n.id];
+                if (depth === undefined || depth >= falloff.length) return;
+                const f = falloff[depth];
+                if (n.fx === null || n.fx === undefined) { n.fx = n.x; n.fy = n.y; }
+                n.fx += dx * f;
+                n.fy += dy * f;
+              });
+              sim.alpha(0.05).restart(); // lightweight tick to redraw
+            }
+          })
+          .on('end', (e, d) => {
+            if (d._wasDragged) {
+              // Unpin all — let physics settle into the new positions
+              nodes.forEach(n => { n.fx = null; n.fy = null; });
+              sim.alphaTarget(0.12);
+              sim.on('end.repin', () => {
+                nodes.forEach(n => { n.fx = n.x; n.fy = n.y; });
+                sim.on('end.repin', null);
+              });
+            }
+            d._wasDragged = false;
+            d._dragDists = null;
+          }))
+        // ── Accessibility: keyboard navigation and screen reader labels ──
+        .attr('tabindex', 0)
+        .attr('role', d => d.type === 'course' ? 'link' : 'button')
+        .attr('aria-label', d => {
+          const name = d.type === 'course' ? (d.title || 'Course') : (d.name || d.id);
+          const hint = d.type === 'course'    ? '— opens course page' :
+                       d.type === 'program'   ? '— filters courses by this program' :
+                       d.type === 'domain'    ? '— filters courses in this domain' :
+                       d.type === 'instructor'? '— filters courses by this instructor' : '';
+          return `${d.type}: ${name} ${hint}`;
+        })
+        .on('keydown', (e, d) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          } else if (['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'].includes(e.key)) {
+            e.preventDefault();
+            // Navigate to a connected neighbor
+            const myId = d.id;
+            const neighborIds = links
+              .map(l => {
+                const s = typeof l.source === 'object' ? l.source.id : l.source;
+                const t = typeof l.target === 'object' ? l.target.id : l.target;
+                return s === myId ? t : t === myId ? s : null;
+              })
+              .filter(Boolean);
+            const neighborEl = node.nodes().find(el => neighborIds.includes(d3.select(el).datum().id));
+            if (neighborEl) neighborEl.focus();
+          } else if (e.key === 'Escape') {
+            e.target.blur();
+            document.getElementById('program-filter').value = '';
+            document.getElementById('search-input').value = '';
+            window._graphFilter = null;
+            applyFilters();
+          }
+        })
+        .on('focus', (e, d) => {
+          // Show tooltip on keyboard focus too
+          const label = d.type === 'course' ? (d.title || '') : (d.name || '');
+          const sub   = d.type === 'instructor' ? 'Instructor — press Enter to filter' :
+                        d.type === 'program' ? 'Program — press Enter to filter' :
+                        d.type === 'domain' ? 'Domain — press Enter to filter all courses' :
+                        'Course — press Enter to open';
+          tooltip.style.display = 'block';
+          tooltip.innerHTML = `<strong>${label}</strong>${sub}`;
+          // Position tooltip at node location
+          const rect = e.target.getBoundingClientRect();
+          tooltip.style.left = (rect.left + 14) + 'px';
+          tooltip.style.top  = (rect.top - 10) + 'px';
+        })
+        .on('blur', () => { tooltip.style.display = 'none'; })
+        .on('mouseover', (e, d) => {
+          const label = d.type === 'course' ? (d.title || '') : (d.name || '');
+          const sub   = d.type === 'instructor' ? 'Instructor — click to filter' :
+                        d.type === 'program' ? 'Program — click to filter' :
+                        d.type === 'domain' ? 'Domain — click to filter all courses' : 'Course';
+          tooltip.style.display = 'block';
+          tooltip.innerHTML = `<strong>${label}</strong>${sub}`;
+        })
+        .on('mousemove', e => {
+          tooltip.style.left = (e.clientX + 14) + 'px';
+          tooltip.style.top  = (e.clientY - 10) + 'px';
+        })
+        .on('mouseout', () => { tooltip.style.display = 'none'; })
+        .on('click', (e, d) => {
+          e.stopPropagation();
+          if (d.type === 'course' && d.url) {
+            window.open(d.url, '_blank');
+          } else if (d.type === 'program') {
+            const progName = programNameMap[d.id] || '';
+            const already = window._graphFilter?.type === 'program' && window._graphFilter?.programName === progName;
+            window._graphFilter = already ? null : { type: 'program', programName: progName };
+            document.getElementById('search-input').value = '';
+            document.getElementById('program-filter').value = '';
+            applyFilters();
+          } else if (d.type === 'domain') {
+            const inp = document.getElementById('search-input');
+            const sel = document.getElementById('program-filter');
+            // Collect program names connected to this domain via BELONGS_TO_DOMAIN edges
+            // After simulation, l.source/l.target may be objects
+            const domainId = d.id;
+            const domainProgs = new Set();
+            links.forEach(l => {
+              if (l.relation !== 'BELONGS_TO_DOMAIN') return;
+              const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
+              const srcId = typeof l.source === 'object' ? l.source.id : l.source;
+              if (tgtId === domainId) {
+                const pName = programNameMap[srcId] || '';
+                if (pName) domainProgs.add(pName);
+              }
+            });
+            const alreadyActive = window._graphFilter?.domainId === domainId;
+            if (alreadyActive) {
+              window._graphFilter = null;
+              inp.value = '';
+              sel.value = '';
+            } else {
+              window._graphFilter = { type: 'domain', domainId, programs: domainProgs };
+              inp.value = '';
+              sel.value = '';
+            }
+            applyFilters();
+          } else if (d.type === 'instructor') {
+            const instrName = instructorNameMap[d.id] || '';
+            const already = window._graphFilter?.type === 'instructor' && window._graphFilter?.instructorName === instrName;
+            window._graphFilter = already ? null : { type: 'instructor', instructorName: instrName };
+            document.getElementById('search-input').value = '';
+            document.getElementById('program-filter').value = '';
+            applyFilters();
+          }
+        });
+
+      // Click on background = clear filters + gather nodes back to center
+      d3svg.on('click', () => {
+        document.getElementById('program-filter').value = '';
+        document.getElementById('search-input').value = '';
+        window._graphFilter = null;
+        applyFilters();
+        // Unpin all and re-run simulation so nodes gather back
+        nodes.forEach(d => { d.fx = null; d.fy = null; });
+        sim.force('x', d3.forceX(W / 2).strength(d => d.type === 'domain' ? 0.18 : d.type === 'program' ? 0.06 : 0.02))
+           .force('y', d3.forceY(H / 2).strength(d => d.type === 'domain' ? 0.18 : d.type === 'program' ? 0.06 : 0.02))
+           .alpha(0.4).alphaTarget(0).restart();
+        sim.on('end.repin', () => {
+          nodes.forEach(n => { n.fx = n.x; n.fy = n.y; });
+          sim.on('end.repin', null);
+        });
+      });
+
+      // Domain labels — always visible, counter-scaled so they stay readable at any zoom
+      const domainLabel = g.append('g')
+        .selectAll('text').data(nodes.filter(n => n.type === 'domain')).join('text')
+        .text(d => (d.name || '').split(' ').slice(0, 2).join(' '))
+        .attr('font-size', 9)
+        .attr('font-weight', '700')
+        .attr('fill', d => nodeColor(d))
+        .attr('text-anchor', 'middle')
+        .attr('dy', -20)
+        .style('pointer-events', 'none')
+        .style('text-shadow', '0 1px 3px rgba(0,0,0,0.8)');
+
+      // Program labels — fade in as you zoom in
+      const label = g.append('g')
+        .selectAll('text').data(programs).join('text')
+        .text(d => (d.name || '').split(' ').slice(0, 3).join(' '))
+        .attr('font-size', 6)
+        .attr('fill', 'rgba(255,255,255,0.4)')
+        .attr('text-anchor', 'middle')
+        .attr('dy', -10)
+        .style('pointer-events', 'none');
+
+      // Course labels — appear only when zoomed in (k > 1.5)
+      const courseLabel = g.append('g')
+        .selectAll('text').data(courseNodes).join('text')
+        .text(d => {
+          const t = d.title || '';
+          const words = t.split(' ');
+          return words.length > 4 ? words.slice(0, 4).join(' ') + '…' : t;
+        })
+        .attr('font-size', 5)
+        .attr('fill', 'rgba(255,255,255,0.75)')
+        .attr('text-anchor', 'middle')
+        .attr('dy', -5)
+        .attr('opacity', 0)
+        .style('pointer-events', 'none');
+
+      // Instructor labels — appear when zoomed in further (k > 2.5)
+      const instructorLabel = g.append('g')
+        .selectAll('text').data(instructors).join('text')
+        .text(d => (d.name || '').split(' ').slice(0, 2).join(' '))
+        .attr('font-size', 5)
+        .attr('fill', 'rgba(255,255,255,0.6)')
+        .attr('text-anchor', 'middle')
+        .attr('dy', -7)
+        .attr('opacity', 0)
+        .style('pointer-events', 'none');
+
+      // Apply initial zoom centred on (CX, CY) — must come AFTER all label vars
+      // are defined (domainLabel, label, courseLabel, instructorLabel) because the
+      // zoom event fires updateLabelScale() synchronously and those consts would
+      // be in the temporal dead zone if this call appeared earlier.
+      d3svg.call(zoomBehavior.transform, d3.zoomIdentity
+        .translate(W / 2 - initScale * CX, H / 2 - initScale * CY)
+        .scale(initScale));
+
+      // Update all label sizes/visibility based on current zoom level k
+      function updateLabelScale() {
+        const k = currentK;
+        // Domain — counter-scale to maintain constant screen size
+        domainLabel
+          .attr('font-size', 9 / k)
+          .attr('dy', -20 / k);
+        // Program — counter-scale, fade in at k > 0.5
+        const progOpacity = Math.min(0.8, Math.max(0, (k - 0.4) * 1.2));
+        label
+          .attr('font-size', 6 / k)
+          .attr('dy', -10 / k)
+          .attr('fill', `rgba(255,255,255,${progOpacity.toFixed(2)})`);
+        // Course — fade in at k > 1.5, counter-scale
+        const courseOpacity = Math.min(1, Math.max(0, (k - 1.5) * 1.5));
+        courseLabel
+          .attr('font-size', 5 / k)
+          .attr('dy', -5 / k)
+          .attr('opacity', courseOpacity);
+        // Instructor — fade in at k > 2.5, counter-scale
+        const instrOpacity = Math.min(1, Math.max(0, (k - 2.5) * 2));
+        instructorLabel
+          .attr('font-size', 5 / k)
+          .attr('dy', -7 / k)
+          .attr('opacity', instrOpacity);
+      }
+
+      sim.on('tick', () => {
+        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+        node.attr('cx', d => d.x).attr('cy', d => d.y);
+        label.attr('x', d => d.x).attr('y', d => d.y);
+        domainLabel.attr('x', d => d.x).attr('y', d => d.y);
+        courseLabel.attr('x', d => d.x).attr('y', d => d.y);
+        instructorLabel.attr('x', d => d.x).attr('y', d => d.y);
+      });
+
+      // ── Adjacency map for drag propagation ──
+      // Built lazily once the initial simulation ends (source/target resolved to objects by then)
+      let adj = null;
+      function ensureAdj() {
+        if (adj) return;
+        adj = {};
+        nodes.forEach(n => { adj[n.id] = []; });
+        links.forEach(l => {
+          const s = typeof l.source === 'object' ? l.source.id : l.source;
+          const t = typeof l.target === 'object' ? l.target.id : l.target;
+          if (adj[s]) adj[s].push(t);
+          if (adj[t]) adj[t].push(s);
+        });
+      }
+
+      function bfsDistances(startId, maxDepth) {
+        ensureAdj();
+        const dist = { [startId]: 0 };
+        const queue = [startId];
+        while (queue.length) {
+          const curr = queue.shift();
+          if (dist[curr] >= maxDepth) continue;
+          (adj[curr] || []).forEach(nb => {
+            if (!(nb in dist)) { dist[nb] = dist[curr] + 1; queue.push(nb); }
+          });
+        }
+        return dist;
+      }
+
+      // After layout settles: pin nodes, build adjacency, then zoom-to-fit so
+      // nothing is cut off regardless of how spread out the clusters are.
+      sim.on('end', () => {
+        nodes.forEach(d => { d.fx = d.x; d.fy = d.y; });
+        ensureAdj();
+
+        // Compute bounding box of all nodes
+        const xs = nodes.map(d => d.x);
+        const ys = nodes.map(d => d.y);
+        const x0 = Math.min(...xs), x1 = Math.max(...xs);
+        const y0 = Math.min(...ys), y1 = Math.max(...ys);
+        const bw = x1 - x0 || 1, bh = y1 - y0 || 1;
+
+        // Scale to fit with 5% padding on each side
+        const scale = Math.min(
+          0.95 * W / bw,
+          0.95 * H / bh,
+          1.5   // never zoom in beyond 1.5x — keep it readable
+        );
+        const tx = W / 2 - scale * (x0 + bw / 2);
+        const ty = H / 2 - scale * (y0 + bh / 2);
+
+        d3svg.transition().duration(600)
+          .call(zoomBehavior.transform,
+            d3.zoomIdentity.translate(tx, ty).scale(scale));
+      });
+
+      // Apply initial label scale
+      updateLabelScale();
+
+      // ── Expose highlight function for applyFilters() ──
+      window.graphHighlight = function(q, prog, gf) {
+        const active = !!(q || prog || gf);
+        node.transition().duration(200)
+          .attr('fill-opacity', d => {
+            if (!active) return d.type === 'instructor' ? 0.6 : d.type === 'course' ? 0.7 : d.type === 'domain' ? 0.25 : 0.9;
+            if (d.type === 'domain') {
+              if (gf && gf.type === 'domain') return gf.domainId === d.id ? 0.5 : 0.06;
+              return 0.1;
+            }
+            if (d.type === 'program') {
+              const name = programNameMap[d.id] || '';
+              const matchQ = !q || name.toLowerCase().includes(q);
+              const matchP = !prog || name === prog;
+              const matchGF = !gf || !gf.programs || gf.programs.has(name);
+              return (matchQ && matchP && matchGF) ? 1 : 0.07;
+            }
+            if (d.type === 'instructor') {
+              const name = instructorNameMap[d.id] || '';
+              const matchQ = !q || name.toLowerCase().includes(q);
+              // if domain filter active, dim instructors not connected to domain programs
+              const matchGF = !gf || !gf.programs || (() => {
+                // check if any course taught by this instructor is in domain programs
+                for (const [cId, iName] of Object.entries(courseInstructorMap)) {
+                  if (iName === name && gf.programs.has(courseProgramMap[cId] || '')) return true;
+                }
+                return false;
+              })();
+              return (matchQ && matchGF) ? 0.85 : 0.07;
+            }
+            if (d.type === 'course') {
+              const matchQ = !q || (d.title||'').toLowerCase().includes(q) || (d.program||'').toLowerCase().includes(q);
+              const matchP = !prog || courseProgramMap[d.id] === prog;
+              const matchGF = !gf || !gf.programs || gf.programs.has(courseProgramMap[d.id] || '');
+              return (matchQ && matchP && matchGF) ? 0.95 : 0.06;
+            }
+            return 0.1;
+          })
+          .attr('r', d => {
+            if (!active) return nodeRadius[d.type];
+            if (d.type === 'domain') {
+              return gf?.domainId === d.id ? nodeRadius.domain * 1.4 : nodeRadius.domain;
+            }
+            if (d.type === 'program') {
+              const name = programNameMap[d.id] || '';
+              const matchP = !prog || name === prog;
+              const matchGF = !gf || !gf.programs || gf.programs.has(name);
+              return (matchP && matchGF) ? nodeRadius.program * 1.5 : nodeRadius.program;
+            }
+            return nodeRadius[d.type];
+          });
+
+        link.transition().duration(200)
+          .attr('stroke-opacity', active ? 0.08 : 1);
+      };
+
+      new ResizeObserver(() => {
+        const r = document.getElementById('graph-panel')?.getBoundingClientRect();
+        const nW = Math.max(r?.width  || graphArea.clientWidth,  300);
+        const nH = Math.max(r?.height || graphArea.clientHeight, 400);
+        if (nW < 10 || nH < 10) return; // not yet painted, skip
+        d3svg.attr('width', nW).attr('height', nH);
+        sim.force('x', d3.forceX(nW / 2).strength(d => d.type === 'domain' ? 0.18 : d.type === 'program' ? 0.06 : 0.02))
+           .force('y', d3.forceY(nH / 2).strength(d => d.type === 'domain' ? 0.18 : d.type === 'program' ? 0.06 : 0.02))
+           .alpha(0.1).restart();
+      }).observe(graphArea);
+
+      // Expose resize helper for mobile tab switch
+      window._graphResizeNow = () => {
+        const r = document.getElementById('graph-panel')?.getBoundingClientRect();
+        const nW = Math.max(r?.width  || 0, window.innerWidth,  300);
+        const nH = Math.max(r?.height || 0, window.innerHeight - 72, 400);
+        d3svg.attr('width', nW).attr('height', nH);
+      };
+    })
+    .catch(err => {
+      console.error('[initGraph]', err);
+      document.getElementById('graph-status').textContent = 'Graph unavailable';
+    });
+})();
+</script>
+
+<script>
+// Resizers removed — layout is now 2-column: graph-area (flex:1) + sidebar (28%)
+
+// ── MOBILE TAB NAVIGATION ──────────────────────────────
+const MOBILE_BP = 768;
+
+function switchTab(tab) {
+  if (window.innerWidth > MOBILE_BP) return;
+  const ga = document.getElementById('graph-area');
+  const sidebar = document.getElementById('sidebar');
+
+  ga.classList.remove('mobile-courses', 'mobile-graph');
+  sidebar.classList.remove('mobile-active');
+
+  if (tab === 'catalog') {
+    ga.classList.add('mobile-courses');
+    // Ensure courses are loaded
+    if (allCourses.length > 0 && filteredCourses.length === 0) {
+      filteredCourses = [...allCourses];
+      renderCourses();
+    }
+  } else if (tab === 'graph') {
+    ga.classList.add('mobile-graph');
+    // Give the DOM time to paint before measuring, then trigger graph resize
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+      if (window._graphResizeNow) window._graphResizeNow();
+    }, 80);
+  } else if (tab === 'pathway') {
+    sidebar.classList.add('mobile-active');
+  }
+
+  document.querySelectorAll('.mobile-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+}
+
+function initMobileTabs() {
+  const ga = document.getElementById('graph-area');
+  if (window.innerWidth <= MOBILE_BP) {
+    if (!ga.classList.contains('mobile-courses') && !ga.classList.contains('mobile-graph')) {
+      ga.classList.add('mobile-courses');
+      document.querySelector('.mobile-tab[data-tab="catalog"]')?.classList.add('active');
+    }
+  } else {
+    // Desktop: remove mobile classes so panels display per CSS
+    ga?.classList.remove('mobile-courses', 'mobile-graph');
+    document.getElementById('sidebar')?.classList.remove('mobile-active');
+  }
+}
+
+window.addEventListener('DOMContentLoaded', initMobileTabs);
+window.addEventListener('resize', initMobileTabs);
+</script>
+
+<!-- Mobile bottom tab bar -->
+<nav class="mobile-tabs" role="tablist" aria-label="Main navigation">
+  <button class="mobile-tab active" data-tab="catalog" onclick="switchTab('catalog')"
+          role="tab" aria-label="Browse courses">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+    </svg>
+    Courses
+  </button>
+  <button class="mobile-tab" data-tab="graph" onclick="switchTab('graph')"
+          role="tab" aria-label="Knowledge graph">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+      <line x1="12" y1="7" x2="5" y2="17"/><line x1="12" y1="7" x2="19" y2="17"/>
+      <line x1="7" y1="19" x2="17" y2="19"/>
+    </svg>
+    Graph
+  </button>
+  <button class="mobile-tab" data-tab="pathway" onclick="switchTab('pathway')"
+          role="tab" aria-label="Build learning pathway">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/>
+    </svg>
+    Pathway
+  </button>
+</nav>
+</body>
+</html>

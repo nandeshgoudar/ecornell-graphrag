@@ -1,0 +1,28 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db
+.claude/
+.venv/
+venv/
+env/
+.playwright-mcp/
+
+# Never commit secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+credentials.json
+service-account*.json
+secrets/
+
+# Large data files / generated artifacts
+courses_embedded.jsonl
+courses_for_embedding.json
+programs_for_embedding.json
+graph.json
+learning_pathway_report.pdf
+*.log
